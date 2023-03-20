@@ -38,4 +38,10 @@ Each configuration sampled from the search space defines a *trial*. During the t
 Additional discussion of these concepts can be found in the [Ray Tune documentation](https://docs.ray.io/en/latest/tune/key-concepts.html).
 
 ## Hyperparameter notation <a name="hyperparameter-notation"></a>
+
+Glimr uses a simplified convention to represent the range of possible search spaces [provided by Ray Tune](https://docs.ray.io/en/latest/tune/api/search_space.html#tune-search-space). Two options are offered:
+1. `list` defines a uniformly-sampled interval of numerics like `int` or `float`.
+2. `set` defines a random choice among discrete options like gradient descent algorithm.
+
+
 ## 
