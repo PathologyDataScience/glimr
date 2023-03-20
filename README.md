@@ -35,7 +35,7 @@ A *search space* is the range of allowable hyperparameter selections that lead t
 
 Each configuration sampled from the search space defines a *trial*. During the trial, the model is built and trained to specification, and the performance of this model is evaluated and recorded. A collection of these trials is called an *experiment*. A *search algorithm* is a strategy for selecting trials to run. This could be a random or grid search where each trial is independent and highly parallelizable, or a more intelligent approach like *Bayesian optimization* that tries to sequentially sample the best configurations based on the outcome of previous trials. A *scheduler* allows early termination of less promising trials so that resources can be devoted to exploring more promising configurations.
 
-Additional discussion of these concepts can be found in the [Ray Tune documentation](https://docs.ray.io/en/latest/tune/key-concepts.html).
+Additional discussion of these concepts can be found in the [key concepts](https://docs.ray.io/en/latest/tune/key-concepts.html) documentation of Ray Tune.
 
 ## Hyperparameter notation <a name="hyperparameter-notation"></a>
 
@@ -43,5 +43,6 @@ Glimr uses a simplified convention to represent the range of possible search spa
 1. `list` defines a uniformly-sampled interval of numerics like `int` or `float`.
 2. `set` defines a random choice among discrete options like gradient descent algorithm.
 
+The `list` convention defines the lower and upper interval range, with an optional quantization. Depending on whether `float` or `int` arguments are provided, this will map to `[ray.tune.uniform](https://docs.ray.io/en/latest/tune/api/doc/ray.tune.uniform.html#ray.tune.uniform)`/`[ray.tune.quniform](https://docs.ray.io/en/latest/tune/api/doc/ray.tune.quniform.html#ray.tune.quniform)` or `[ray.tune.randint](https://docs.ray.io/en/latest/tune/api/doc/ray.tune.randint.html#ray.tune.randint)`/`[ray.tune.qrandint](https://docs.ray.io/en/latest/tune/api/doc/ray.tune.qrandint.html#ray.tune.qrandint)`.
 
 ## 
