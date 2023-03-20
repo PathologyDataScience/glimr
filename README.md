@@ -1,2 +1,2 @@
 # glimr
-A wrapper for the ray[tune] package.
+A simplified wrapper for the Ray Tune package.
