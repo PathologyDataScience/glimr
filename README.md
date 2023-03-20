@@ -22,9 +22,9 @@ pip install glimr
 - [User guide](#user-guide)
 - [Terminology](#terminology)
 - [Hyperparater notation](#hyperparameter-notation)
-- [An example search space](#search-space)
-- [Details - the builder function](#builder)
-- [Details - the data loader](#builder)
+- [Creating a search space](#search-space)
+- [The builder function](#builder)
+- [The data loader](#builder)
 
 # User guide <a name="user-guide"></a>
 ## Terminology <a name="terminology"></a>
@@ -43,6 +43,26 @@ Glimr uses a simplified convention to represent the range of possible search spa
 1. `list` defines a uniformly-sampled interval of numerics like `int` or `float`.
 2. `set` defines a random choice among discrete options like gradient descent algorithm.
 
-The `list` convention defines the lower and upper interval range, with an optional quantization. Depending on whether `float` or `int` arguments are provided, this will map to [`ray.tune.uniform`](https://docs.ray.io/en/latest/tune/api/doc/ray.tune.uniform.html#ray.tune.uniform)/[`ray.tune.quniform`](https://docs.ray.io/en/latest/tune/api/doc/ray.tune.quniform.html#ray.tune.quniform) or [`ray.tune.randint`](https://docs.ray.io/en/latest/tune/api/doc/ray.tune.randint.html#ray.tune.randint)/[`ray.tune.qrandint`](https://docs.ray.io/en/latest/tune/api/doc/ray.tune.qrandint.html#ray.tune.qrandint).
+The `list` notation defines the lower and upper interval range, with an optional quantization. Depending on whether `float` or `int` arguments are provided, this will map to the Ray Tune search space API functions [`ray.tune.uniform`](https://docs.ray.io/en/latest/tune/api/doc/ray.tune.uniform.html#ray.tune.uniform)/[`ray.tune.quniform`](https://docs.ray.io/en/latest/tune/api/doc/ray.tune.quniform.html#ray.tune.quniform) or [`ray.tune.randint`](https://docs.ray.io/en/latest/tune/api/doc/ray.tune.randint.html#ray.tune.randint)/[`ray.tune.qrandint`](https://docs.ray.io/en/latest/tune/api/doc/ray.tune.qrandint.html#ray.tune.qrandint). If no quantization is provided, the interval will be divided in ten segments.
+
+```
+# defines a parameter interval from 0. to 20. with quantization 2.
+{"parameter": [0., 20.]}
+
+# defines a parameter with the same interval but with quantization 1.
+{"parameter": [0., 20., 1.]}
+```
+
+The `set` notation can be used with any types, with each option being equally likely to be selected. This maps to the [`ray.tune.choice`](https://docs.ray.io/en/latest/tune/api/doc/ray.tune.choice.html#ray.tune.choice) function from the Ray Tune search space API.
+
+```
+# choose between stochastic-gradient descent and adam
+{"gradient_alg": {"sgd", "adam"}}
+
+# select among log-spaced values for learning rate
+{"learning_rate": {1e-5, 1e-4, 1e-3, 1e-2}}
+```
+
+> Advanced users can override this notation and instead directly use the [Ray Tune search space API functions](https://docs.ray.io/en/latest/tune/api/search_space.html#tune-search-space). Mapping from `list` and `set` is performed by the [`set_hyperparameter()` function](https://github.com/cooperlab/glimr/blob/abefc5820a873691d396001d43d883ce416d429b/glimr/search/utils.py#L239).
 
 ## 
