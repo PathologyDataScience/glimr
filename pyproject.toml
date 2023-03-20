@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "glimr"
+authors = [
+    {name = "Lee Cooper", email = "lee.cooper@northwestern.edu"},
+]
+description = "A wrapper for Ray Tune."
+readme = "README.md"
+requires-python = ">=3.7"
+keywords = ["machine-learning", "biostatistics", "bioinformatics"]
+classifiers=[
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Bio-Informatics"
+]
+license = {text = "Apache-2.0"}
+dependencies = [
+    "ray>=2.3.0"
+    "tensorflow>=2.5"
+]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+dev = [
+    "tox",
+    "pytest>=6.0",
+    "coverage",
+    "pytest-cov"
+]
+
+[tool.setuptools]
+packages = ["glimr"]
+
+[tool.setuptools_scm]
+
+[project.urls]
+"Github" = "https://github.com/PathologyDataScience/glimr"
