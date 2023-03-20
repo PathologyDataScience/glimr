@@ -43,6 +43,6 @@ Glimr uses a simplified convention to represent the range of possible search spa
 1. `list` defines a uniformly-sampled interval of numerics like `int` or `float`.
 2. `set` defines a random choice among discrete options like gradient descent algorithm.
 
-The `list` convention defines the lower and upper interval range, with an optional quantization. Depending on whether `float` or `int` arguments are provided, this will map to [ray.tune.uniform](https://docs.ray.io/en/latest/tune/api/doc/ray.tune.uniform.html#ray.tune.uniform)/[`ray.tune.quniform`](https://docs.ray.io/en/latest/tune/api/doc/ray.tune.quniform.html#ray.tune.quniform) or [ray.tune.randint](https://docs.ray.io/en/latest/tune/api/doc/ray.tune.randint.html#ray.tune.randint)/[ray.tune.qrandint](https://docs.ray.io/en/latest/tune/api/doc/ray.tune.qrandint.html#ray.tune.qrandint).
+The `list` convention defines the lower and upper interval range, with an optional quantization. Depending on whether `float` or `int` arguments are provided, this will map to [`ray.tune.uniform`](https://docs.ray.io/en/latest/tune/api/doc/ray.tune.uniform.html#ray.tune.uniform)/[`ray.tune.quniform`](https://docs.ray.io/en/latest/tune/api/doc/ray.tune.quniform.html#ray.tune.quniform) or [`ray.tune.randint`](https://docs.ray.io/en/latest/tune/api/doc/ray.tune.randint.html#ray.tune.randint)/[`ray.tune.qrandint`](https://docs.ray.io/en/latest/tune/api/doc/ray.tune.qrandint.html#ray.tune.qrandint).
 
 ## 
