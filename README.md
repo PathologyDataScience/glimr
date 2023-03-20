@@ -3,7 +3,7 @@ A simplified wrapper for hyperparameter search with [Ray Tune](https://docs.ray.
 
 ## Overview
 
-Glimr was developed to provide hyperparameter tuning capabilities for [survivalnet](https://github.com/PathologyDataScience/survivalnet2), [mil](https://github.com/PathologyDataScience/mil), and other machine learning packages. It simplifies the complexities of Ray Tune without compromising the ability of advanced users to control details of the tuning process. Glimr can be integrated into any application with three simple steps:
+Glimr was developed to provide hyperparameter tuning capabilities for [survivalnet](https://github.com/PathologyDataScience/survivalnet2), [mil](https://github.com/PathologyDataScience/mil), and other TensorFlow/keras-based machine learning packages. It simplifies the complexities of Ray Tune without compromising the ability of advanced users to control details of the tuning process. Glimr can be integrated into any application with three simple steps:
 
 1. Define the search space of possible model configurations using the glimr hyperparameter notation
 2. Implement a model-building function that creates a model, losses, and metrics from a configuration
@@ -24,7 +24,7 @@ pip install glimr
 - [Hyperparater notation](#hyperparameter-notation)
 - [Creating a search space](#search-space)
 - [The builder function](#builder)
-- [The data loader](#builder)
+- [The data loader](#dataloader)
 
 # User guide <a name="user-guide"></a>
 ## Terminology <a name="terminology"></a>
@@ -63,6 +63,11 @@ The `set` notation can be used with any types, with each option being equally li
 {"learning_rate": {1e-5, 1e-4, 1e-3, 1e-2}}
 ```
 
-> Advanced users can override this notation and instead directly use the [Ray Tune search space API functions](https://docs.ray.io/en/latest/tune/api/search_space.html#tune-search-space). Mapping from `list` and `set` is performed by the [`set_hyperparameter()` function](https://github.com/cooperlab/glimr/blob/abefc5820a873691d396001d43d883ce416d429b/glimr/search/utils.py#L239).
+**Notes:**
+> Advanced users can override this notation and instead directly use the [Ray Tune search space API functions](https://docs.ray.io/en/latest/tune/api/search_space.html#tune-search-space). Mapping from `list` and `set` is performed by the [`set_hyperparameter()`](https://github.com/cooperlab/glimr/blob/abefc5820a873691d396001d43d883ce416d429b/glimr/search/utils.py#L239) function.
 
-## 
+## Creating a search space <a name="search-space"></a>
+
+## The builder function <a name="builder"></a>
+
+## The data loader <a name="dataloader"></a>
