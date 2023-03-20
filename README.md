@@ -45,7 +45,7 @@ Glimr uses a simplified convention to represent the range of possible search spa
 
 The `list` notation defines the lower and upper interval range, with an optional quantization. Depending on whether `float` or `int` arguments are provided, this will map to the Ray Tune search space API functions [`ray.tune.uniform`](https://docs.ray.io/en/latest/tune/api/doc/ray.tune.uniform.html#ray.tune.uniform)/[`ray.tune.quniform`](https://docs.ray.io/en/latest/tune/api/doc/ray.tune.quniform.html#ray.tune.quniform) or [`ray.tune.randint`](https://docs.ray.io/en/latest/tune/api/doc/ray.tune.randint.html#ray.tune.randint)/[`ray.tune.qrandint`](https://docs.ray.io/en/latest/tune/api/doc/ray.tune.qrandint.html#ray.tune.qrandint). If no quantization is provided, the interval will be divided in ten segments.
 
-```python:
+```python
 # defines a parameter interval from 0. to 20. with quantization 2.
 {"parameter": [0., 20.]}
 
@@ -55,7 +55,7 @@ The `list` notation defines the lower and upper interval range, with an optional
 
 The `set` notation can be used with any types, with each option being equally likely to be selected. This maps to the [`ray.tune.choice`](https://docs.ray.io/en/latest/tune/api/doc/ray.tune.choice.html#ray.tune.choice) function from the Ray Tune search space API.
 
-```python:
+```python
 # choose between stochastic-gradient descent and adam
 {"gradient_alg": {"sgd", "adam"}}
 
