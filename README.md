@@ -144,7 +144,7 @@ Here, `metrics={"f1": "f1_score"}` defines a metric that will be registered as `
 
 #### Data
 
-The `data` value contains keyword arguments that are passed to the dataloader. At a minimum this must include `batch_size`, but can also include parameters to control data loading (e.g. prefetch) and preprocessing steps like training data augmentation.
+The `data` value contains keyword arguments that are passed to the dataloader. At a minimum this must include `batch_size`, but can also include parameters to control data loading (e.g. prefetch) and preprocessing steps like training data augmentation. A typical data search space will combine constants like data paths with hyperparameters for things like data preprocessing steps and parameters.
 
 #### Optimization
 
