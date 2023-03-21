@@ -17,6 +17,8 @@ glimr is pip installable
 pip install glimr
 ```
 
+# User guide <a name="user-guide"></a>
+
 ## Contents
 
 - [User guide](#user-guide)
@@ -25,8 +27,9 @@ pip install glimr
 - [Creating a search space](#search-space)
 - [The builder function](#builder)
 - [The data loader](#dataloader)
+- [Next steps](#next-steps)
 
-# User guide <a name="user-guide"></a>
+
 ## Terminology <a name="terminology"></a>
 
 Ray Tune is a hyperparameter search library for building highly optmized models. A *hyperparameter* is any selected parameter used in the design or training of a model including but not limited to network architecture (depth, width, activations, topology), optimization (gradient algorithm, learning rate, scheduling), and other training parameters like losses and loss parameters. 
@@ -63,11 +66,93 @@ The `set` notation can be used with any types, with each option being equally li
 {"learning_rate": {1e-5, 1e-4, 1e-3, 1e-2}}
 ```
 
-**Notes:**
+**Note:**
 > Advanced users can override this notation and instead directly use the [Ray Tune search space API functions](https://docs.ray.io/en/latest/tune/api/search_space.html#tune-search-space). Mapping from `list` and `set` is performed by the [`set_hyperparameter()`](https://github.com/cooperlab/glimr/blob/abefc5820a873691d396001d43d883ce416d429b/glimr/search/utils.py#L239) function.
 
 ## Creating a search space <a name="search-space"></a>
 
+A search space is simply a dictionary of hyperparameters. Dictionaries can be nested to improve organiziation by separating elements of the space. For example, here is a hypothetical search space for a simple two-layer network that searches the units, activation functions, and dropout for each layer, along with training hyperparameters:
+
+```python
+search = {
+  layer1: {
+    activation: ["relu", "gelu"],
+    dropout: [0.0, 0.5, 0.05],
+    units: {64, 48, 32, 16},
+  }
+  layer2: {
+    activation: ["relu", "gelu"],
+    dropout: [0.0, 0.5, 0.05],
+    units: {64, 48, 32, 16},
+  }
+  optimization: {
+    batch={32, 64, 128},
+    method={"rms", "sgd"},
+    learning_rate=[1e-5, 1e-2, 1e-5],
+    momentum=[0.0, 1e-1, 1e-2]
+  }
+}
+```
+
+If we want to set a specific hyperparameter value, we can simply assign this value outside of the `list`/`set` notation:
+
+```python
+layer2: {
+  activation: "relu",
+  dropout: 0.5,
+  units: 32,
+}
+```
+
+**Note:**
+>Configuration values must be pickleable for Ray Tune to pass configurations to its workers. For this reason, callables like losses or metrics that are not pickleable have to be encoded as strings and decoded in the model building function. In the simple example above, that leads us to use `sgd` instead of `tf.keras.optimizers.experimental.SGD`. When we write the model builder function, we can decode the string to produce the optmizer object.
+
+### Required elements
+
+Glimre is flexible and can be used with a wide variety of models, due to the user-defined configurations and model builder functions. There are some required elements of the search space, however. These constraints are implemented in [`glimr.Search.trainiable()`](https://github.com/PathologyDataScience/survivalnet2/blob/1b3c2ac4d6866e3eabdbc85063cd20df62aed292/survivalnet2/search/search.py#L297) which is used to build run each trial.
+
+#### Tasks
+Terminal model outputs/layers must be captured as values in a `tasks` key that is located at the top level of the space. This is required to support multi-task models and to correctly assign metrics and losses to model outputs. Each key in `tasks` defines a task name, and a value defining the loss, loss weight, and metrics for that task. For example, from our model above, we can define the second layer as a task:
+
+```python
+search = {
+  layer1: {
+    activation: ["relu", "gelu"],
+    dropout: [0.0, 0.5, 0.05],
+    units: {64, 48, 32, 16},
+  }
+  tasks: {
+    task1: {
+      activation: ["relu", "gelu"],
+      dropout: [0.0, 0.5, 0.05],
+      units: {64, 48, 32, 16},
+      loss="binary_crossentropy",
+      loss_weight=1.0,
+      metrics={"f1": "f1_score"},
+    }
+  }
+  optimization: {
+    batch={32, 64, 128},
+    method={"rms", "sgd"},
+    learning_rate=[1e-5, 1e-2, 1e-5],
+    momentum=[0.0, 1e-1, 1e-2]
+  }
+}
+```
+
+Here, `metrics={"f1": "f1_score"}` defines a metric that will be registered as `f1` during model compilation, and the value `f1_score` can be decoded by your model builder to generate a `tf.keras.metrics.F1Score` object for compilation.
+
+#### Optimization
+
+The `optimization` key represents gradient optimizaton hyperparameters including `method`, `learning_rate`, and `batch` size. The optimization configuration is decoded by [`keras_optimizer`](https://github.com/cooperlab/glimr/blob/47ca4e58da1296805557947f78afd8acf533005d/glimr/search/utils.py#L210) to produce an optimizer object for model compilaton.
+
+#### Epochs
+
+The maximum number of epochs is encoded as an `int` under key `epochs`. This is also controllable through the class attribute `Search.stopper`.
+
 ## The builder function <a name="builder"></a>
 
 ## The data loader <a name="dataloader"></a>
+
+## Next steps <a name="next-steps"></a>
+
