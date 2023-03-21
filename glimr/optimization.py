@@ -2,6 +2,7 @@ from glimr.utils import check_tunable, set_hyperparameter
 
 
 def optimization_space(
+    epochs=100,
     batch={32, 64, 128},
     method={"rms", "sgd", "adadelta", "adagrad", "adam"},
     learning_rate=[1e-5, 1e-2, 1e-5],
@@ -19,6 +20,9 @@ def optimization_space(
     (no search).
     Parameters
     ----------
+    epochs : int
+        The maximum number of epochs to train a model for. This can be overrided by the
+        scheduler or by the `stopper` attribute of a `Search` object.
     batch : set[int]
         A set of batch sizes (int) to explore. Default value is {32, 64, 128}.
     method : set[string]
@@ -46,6 +50,10 @@ def optimization_space(
     task : dict
         A ray optimization search space.
     """
+    
+    # verify that epochs is int
+    if not isinstance(epochs, int):
+        raise ValueError("epochs must be a positive integer.")
 
     # verify that batch is int, set of int, or list of int
     check_tunable(batch, int, "batch")
