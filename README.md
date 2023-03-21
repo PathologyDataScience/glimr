@@ -175,8 +175,16 @@ model = tf.keras.Model(inputs=inputs, outputs=named)
 
 ## The data loader <a name="dataloader"></a>
 
-Naming labels using a dict with task names
+The dataloader is a simple function that generates two `tf.data.Dataset` objects used for training and validation. The training object is used to build models and the valdiation object is used to report accuracy to Ray Tune for search, checkpointing, and early termination.
+
+### Label names
+
+Labels must be structured in a dictionary with task names for correct linking to the model tasks:
+
+```python
+train_dataset = tf.data.Dataset.from_tensor_slices((features[train, :], {'task1': labels[train]}))
+```
 
 ## Next steps <a name="next-steps"></a>
 
-The Search class.
+The `Search` class provides the interface for running experiments, reporting outcomes, and saving models. Check out the example notebooks for using this class with a concrete example of the concepts described above.
