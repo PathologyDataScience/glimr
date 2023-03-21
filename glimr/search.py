@@ -33,8 +33,9 @@ class Search(object):
         sampled from the search space.
     loader : callable
         A function that returns batched training and validation datasets
-        of type tf.data.Dataset. This function should accept a single
-        argument defining the batch size.
+        of type tf.data.Dataset. This function should include a "batch"
+        keyword argument and may include other keyword arguments to control
+        data loading and preprocessing behavior.
     metric : str
         The name of the metric to optimize. This is in the form "task_name"
         where "task" is the task name and "name" is the key value of the
@@ -43,9 +44,6 @@ class Search(object):
     mode : {"max", "min"}
         Either "max" or "min" indicating whether to maximize or minimize
         the metric. Default value is "max".
-    loader_kwargs : dict
-        Keyword arguments for `loader`. Allows customization of data loader
-        behavior. Default value is None.
     fit_kwargs : dict
         Keyword arguments for tf.keras.model.fit. Allows customization of
         keras model training options. Default value is None.
@@ -111,7 +109,6 @@ class Search(object):
         space["builder"] = builder
         space["fit_kwargs"] = fit_kwargs
         space["loader"] = loader
-        space["loader_kwargs"] = loader_kwargs
         self._space = space
 
         # extract default optimization metric - first task & first metric
@@ -321,7 +318,7 @@ class Search(object):
 
         # load example data, generate random train/test split
         train_dataset, validation_dataset = config["loader"](
-            config["optimization"]["batch"], **config["loader_kwargs"]
+            **config["data"]
         )
 
         # epoch reporting of performance metrics - link keras metric names
