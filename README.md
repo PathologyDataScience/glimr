@@ -146,9 +146,7 @@ Here, `metrics={"f1": "f1_score"}` defines a metric that will be registered as `
 
 The `optimization` key represents gradient optimizaton hyperparameters including `method`, `learning_rate`, and `batch` size. The optimization configuration is decoded by [`keras_optimizer`](https://github.com/cooperlab/glimr/blob/47ca4e58da1296805557947f78afd8acf533005d/glimr/search/utils.py#L210) to produce an optimizer object for model compilaton.
 
-#### Epochs
-
-The maximum number of epochs is encoded as an `int` under key `epochs`. This is also controllable through the class attribute `Search.stopper`.
+The maximum number of epochs is encoded in `optimization` with the key `epochs`. The maximum number of epochs is also controllable through the class attribute `Search.stopper`. A trial may terminate early if the model converges to the stopping criteria, or if the scheduler determines it is performing poorly.
 
 ## The model-building function <a name="builder"></a>
 
