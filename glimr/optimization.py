@@ -71,6 +71,7 @@ def optimization_space(
     # convert to ray search space
     space = set_hyperparameter(
         {
+            "epochs": epochs,
             "batch": batch,
             "method": method,
             "learning_rate": learning_rate,
