@@ -3,8 +3,8 @@ This package contains hyperparameter tuning tools
 """
 
 # make functions available at the package level using shadow imports
-from .search import Search
-from .utils import (
+from glimr.search import Search
+from glimr.utils import (
     check_tunable,
     keras_losses,
     keras_metrics,
