@@ -142,11 +142,15 @@ search = {
 
 Here, `metrics={"f1": "f1_score"}` defines a metric that will be registered as `f1` during model compilation, and the value `f1_score` can be decoded by your model builder to generate a `tf.keras.metrics.F1Score` object for compilation.
 
+#### Data
+
+The `data` value contains keyword arguments that are passed to the dataloader. At a minimum this must include `batch_size`, but can also include parameters to control data loading (e.g. prefetch) and preprocessing steps like training data augmentation. A typical data search space will combine constants like data paths with hyperparameters for things like data preprocessing steps and parameters.
+
 #### Optimization
 
-The `optimization` key represents gradient optimizaton hyperparameters including `method`, `learning_rate`, and `batch` size. The optimization configuration is decoded by [`keras_optimizer`](https://github.com/cooperlab/glimr/blob/47ca4e58da1296805557947f78afd8acf533005d/glimr/search/utils.py#L210) to produce an optimizer object for model compilaton.
+The `optimization` value represents gradient optimizaton hyperparameters including `method`, `learning_rate`, and `batch` size. The optimization configuration is decoded by [`keras_optimizer`](https://github.com/cooperlab/glimr/blob/47ca4e58da1296805557947f78afd8acf533005d/glimr/search/utils.py#L210) to produce an optimizer object for model compilaton.
 
-The maximum number of epochs is encoded in `optimization` with the key `epochs`. The maximum number of epochs is also controllable through the class attribute `Search.stopper`. A trial may terminate early if the model converges to the stopping criteria, or if the scheduler determines it is performing poorly.
+The maximum number of epochs is encoded as `epochs` in `optimization`. The maximum number of epochs is also controllable through the class attribute `Search.stopper`. A trial may terminate early if the model converges to the stopping criteria, or if the scheduler determines it is performing poorly.
 
 ## The model-building function <a name="builder"></a>
 
