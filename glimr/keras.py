@@ -1,7 +1,7 @@
 import tensorflow as tf
 
 
-def keras_losses(config):
+def keras_losses(config, mapper):
     """A utility to build loss and loss weight dictionaries for
     tf.keras.Model.compile.
 
@@ -15,6 +15,8 @@ def keras_losses(config):
         a "tasks" key that links to task dictionaries. Each task dictionary
         should define a "loss" key with a str value defining the name of the
         loss to apply to the task.
+    mapper : dict
+        A dict mapping metric names to tf.keras.metrics.Metric objects.
 
     Returns
     -------
@@ -28,7 +30,7 @@ def keras_losses(config):
 
     # create loss dictionary
     losses = {
-        name: string_to_loss(config["tasks"][name]["loss"]) for name in config["tasks"]
+        name: mapper[config["tasks"][name]["loss"]] for name in config["tasks"]
     }
 
     # create loss weight dictionary
@@ -37,7 +39,7 @@ def keras_losses(config):
     return losses, weights
 
 
-def keras_metrics(config):
+def keras_metrics(config, mapper):
     """A utility to build metric dictionaries for tf.keras.Model.compile.
 
     Given a configuration where task metrics are defined as strings, convert
@@ -52,6 +54,8 @@ def keras_metrics(config):
         a "tasks" key that links to task dictionaries. Each task dictionary
         should define a "metrics" key with a dict value that maps metric
         display names to str values that will be consumed by string_to_metric.
+    mapper : dict
+        A dict mapping metric names to tf.keras.metrics.Metric objects.
 
     Returns
     -------
@@ -70,7 +74,7 @@ def keras_metrics(config):
         display = list(config["tasks"][task]["metrics"].keys())
 
         # wrap metrics in a list if more than 1
-        task_metrics = [string_to_metric(n, d) for n, d in zip(names, display)]
+        task_metrics = [mapper[n](name=d) for n, d in zip(names, display)]
 
         # assign to metrics dict
         if len(names) > 1:
