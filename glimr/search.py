@@ -337,7 +337,7 @@ class Search(object):
         # train the model for the desired epochs using the call back
         model.fit(
             train_dataset,
-            epochs=config["epochs"],
+            epochs=config["optimization"]["epochs"],
             validation_data=validation_dataset,
             callbacks=[callback],
             verbose=0,
