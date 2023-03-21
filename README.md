@@ -25,7 +25,7 @@ pip install glimr
 - [Terminology](#terminology)
 - [Hyperparater notation](#hyperparameter-notation)
 - [Creating a search space](#search-space)
-- [The builder function](#builder)
+- [The model-building function](#builder)
 - [The data loader](#dataloader)
 - [Next steps](#next-steps)
 
@@ -150,9 +150,33 @@ The `optimization` key represents gradient optimizaton hyperparameters including
 
 The maximum number of epochs is encoded as an `int` under key `epochs`. This is also controllable through the class attribute `Search.stopper`.
 
-## The builder function <a name="builder"></a>
+## The model-building function <a name="builder"></a>
+
+The model builder is a user-defined function that takes a configuration as a single argument. This configuration is a sample from the search space, and represents specific choices of hyperparameter values to use in building and training a model. The builder should return `model`, `losses`, `loss_weights`, and `metrics` values for use with `tf.keras.Model.compile`.
+
+### Helper functions
+
+We provide helper functions in `glimr.utils` to aid in the model building process. [`utils.keras_losses()`](https://github.com/cooperlab/glimr/blob/4217444a61381decbf14fc7bb81c5056a0f1f4e5/glimr/search/utils.py#L70) can be used to generate a dictionary of output name / loss pairs consistent with the naming expected by `tf.keras.Model.compile()`. [`utils.keras_metrics()`](https://github.com/cooperlab/glimr/blob/4217444a61381decbf14fc7bb81c5056a0f1f4e5/glimr/search/utils.py#L166) performs a similar function for metrics.
+
+### Naming model outputs
+
+Since tasks represent model outputs, each task has to provide a named output that can be used for registering metrics and losses in model compilation:
+
+```python
+task_layer = tf.keras.layers.Dense(units, activation=activation, name="task1")
+```
+
+Furthermore, these names have to be used when creating the `tf.keras.Model` object
+
+```python
+named = {f"{name}": task for (name, task) in zip(config["tasks"].keys(), tasks)}
+model = tf.keras.Model(inputs=inputs, outputs=named)
+```
 
 ## The data loader <a name="dataloader"></a>
 
+Naming labels using a dict with task names
+
 ## Next steps <a name="next-steps"></a>
 
+The Search class.
