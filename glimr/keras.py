@@ -11,12 +11,13 @@ def keras_losses(config, mapper):
     Parameters
     ----------
     config : dict
-        A configuration defining the losses for each task. Config should have
-        a "tasks" key that links to task dictionaries. Each task dictionary
-        should define a "loss" key with a str value defining the name of the
-        loss to apply to the task.
+        A configuration containing tasks and their losses. Each task in config
+        should have a "loss" key that links to a loss dictionary. The loss
+        dictionary contains a "name" that indexes a tf.keras.losses.Loss object
+        or callable in `mapper`, and an optional "kwargs" dictionary defining
+        keyword arguments for creating the loss.
     mapper : dict
-        A dict mapping metric names to tf.keras.metrics.Metric objects.
+        A dict mapping metric names to tf.keras.losses.Loss objects.
 
     Returns
     -------
@@ -29,9 +30,14 @@ def keras_losses(config, mapper):
     """
 
     # create loss dictionary
-    losses = {
-        name: mapper[config["tasks"][name]["loss"]] for name in config["tasks"]
-    }
+    losses = {}
+    for task in config["tasks"]:
+        fn = mapper[config["tasks"][task]["loss"]["name"]]
+        if "kwargs" in config["tasks"][task]["loss"]:
+            kwargs = config["tasks"][task]["loss"]["kwargs"]
+        else:
+            kwargs = {}
+        losses[task] = fn(**kwargs)
 
     # create loss weight dictionary
     weights = {name: config["tasks"][name]["loss_weight"] for name in config["tasks"]}
@@ -44,16 +50,16 @@ def keras_metrics(config, mapper):
 
     Given a configuration where task metrics are defined as strings, convert
     the strings to tf.keras.metrics.Metric objects and format a dict for model
-    compilation. This handles the expected naming of metrics which differs for
-    single task and multiple task models.
+    compilation.
 
     Parameters
     ----------
     config : dict
-        A configuration defining the metrics for each task. Config should have
-        a "tasks" key that links to task dictionaries. Each task dictionary
-        should define a "metrics" key with a dict value that maps metric
-        display names to str values that will be consumed by string_to_metric.
+        A configuration defining the metrics for each task. Each task in config
+        should have a "metrics" key that links to a metrics dictionary. The
+        metrics dictionary contains a "name" that indexes a tf.keras.metrics.Metric
+        object in `mapper`, and an optional "kwargs" dictionary defining keyword
+        arguments for creating the metric.
     mapper : dict
         A dict mapping metric names to tf.keras.metrics.Metric objects.
 
@@ -67,20 +73,29 @@ def keras_metrics(config, mapper):
     # create a metric dictionary from the config
     metrics = {}
     for task in config["tasks"]:
-        # get metric names for task
-        names = list(config["tasks"][task]["metrics"].values())
+        # get task metric dictionary
+        task_metrics = config["tasks"][task]["metrics"]
 
-        # get user-defined designations for these metrics
-        display = list(config["tasks"][task]["metrics"].keys())
+        # get metric names for task
+        names = [task_metrics[metric]["name"] for metric in task_metrics]
+
+        # get kwargs for these metrics
+        kwargs = [
+            task_metrics[metric]["kwargs"] if "kwargs" in task_metrics[metric] else {}
+            for metric in task_metrics
+        ]
+
+        # get user-defined display names for these metrics
+        display = list(task_metrics.keys())
 
         # wrap metrics in a list if more than 1
-        task_metrics = [mapper[n](name=d) for n, d in zip(names, display)]
+        objects = [mapper[n](name=d, **k) for n, d, k in zip(names, display, kwargs)]
 
         # assign to metrics dict
         if len(names) > 1:
-            metrics[task] = task_metrics
+            metrics[task] = objects
         else:
-            metrics[task] = task_metrics[0]
+            metrics[task] = objects[0]
 
     return metrics
 
