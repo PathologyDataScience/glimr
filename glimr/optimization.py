@@ -1,15 +1,15 @@
-from glimr.utils import check_tunable, set_hyperparameter
+from ray import tune
 
 
 def optimization_space(
     epochs=100,
-    batch={32, 64, 128},
-    method={"rms", "sgd", "adadelta", "adagrad", "adam"},
-    learning_rate=[1e-5, 1e-2, 1e-5],
-    rho=[0.5, 1.0, 1e-2],
-    momentum=[0.0, 1e-1, 1e-2],
-    beta_1=[0.5, 1.0, 1e-2],
-    beta_2=[0.5, 1.0, 1e-2],
+    batch=tune.choice([32, 64, 128]),
+    method=tune.choice(["rms", "sgd", "adadelta", "adagrad", "adam"]),
+    learning_rate=tune.quniform(1e-5, 1e-2, 1e-5),
+    rho=tune.quniform(0.5, 1.0, 1e-2),
+    momentum=tune.quniform(0.0, 1e-1, 1e-2),
+    beta_1=tune.quniform(0.5, 1.0, 1e-2),
+    beta_2=tune.quniform(0.5, 1.0, 1e-2),
 ):
     """Generate a search space for a training and optimization parameters.
     This function is used to generate a search space for batching and gradient optimization
@@ -50,36 +50,17 @@ def optimization_space(
     task : dict
         A ray optimization search space.
     """
-    
-    # verify that epochs is int
-    if not isinstance(epochs, int):
-        raise ValueError("epochs must be a positive integer.")
-
-    # verify that batch is int, set of int, or list of int
-    check_tunable(batch, int, "batch")
-
-    # verify that method is str or set of str
-    check_tunable(method, str, "method")
-
-    # verify float parameters
-    check_tunable(learning_rate, float, "learning_rate")
-    check_tunable(rho, float, "rho")
-    check_tunable(momentum, float, "momentum")
-    check_tunable(beta_1, float, "beta_1")
-    check_tunable(beta_2, float, "beta_2")
 
     # convert to ray search space
-    space = set_hyperparameter(
-        {
-            "epochs": epochs,
-            "batch": batch,
-            "method": method,
-            "learning_rate": learning_rate,
-            "rho": rho,
-            "momentum": momentum,
-            "beta_1": beta_1,
-            "beta_2": beta_2,
-        }
-    )
+    space = {
+        "epochs": epochs,
+        "batch": batch,
+        "method": method,
+        "learning_rate": learning_rate,
+        "rho": rho,
+        "momentum": momentum,
+        "beta_1": beta_1,
+        "beta_2": beta_2,
+    }
 
     return space
