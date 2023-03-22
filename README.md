@@ -21,9 +21,9 @@ pip install glimr
 
 ## Contents
 
-- [User guide](#user-guide)
 - [Terminology](#terminology)
-- [Hyperparater notation](#hyperparameter-notation)
+- [Module overview](#overview)
+- [The ray.tune.search hyperparameter API](#ray-api)
 - [Creating a search space](#search-space)
 - [The model-building function](#builder)
 - [The data loader](#dataloader)
@@ -40,7 +40,15 @@ Each configuration sampled from the search space defines a *trial*. During the t
 
 Additional discussion of these concepts can be found in the [key concepts](https://docs.ray.io/en/latest/tune/key-concepts.html) documentation of Ray Tune.
 
-## Hyperparameter notation <a name="hyperparameter-notation"></a>
+## Module overview <a name="overview"></a>
+
+Glimr consists of four modules:
+1. `search` implements the `Search` class that is used to run trials and experiments. This class contains all the details of configuring Ray Tune checkpointing, reporting, and model training behavior. 
+2. `utils` contains functions to help users build and work with search spaces. This module will be expanded in the future.
+3. `keras` contains functions to help with model building logic, and simplify the process of building data structures that keras needs to compile models with losses, metrics, and optimization algorithms.
+4. `optimization` implements a default search space for gradient optimizers.
+
+## The ray.tune.search hyperparameter API]<a name="ray-api"></a>
 
 Glimr uses a simplified convention to represent the range of possible search spaces [provided by Ray Tune](https://docs.ray.io/en/latest/tune/api/search_space.html#tune-search-space). Two options are offered:
 1. `list` defines a uniformly-sampled interval of numerics like `int` or `float`.
