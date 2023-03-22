@@ -21,9 +21,9 @@ pip install glimr
 
 ## Contents
 
-- [User guide](#user-guide)
 - [Terminology](#terminology)
-- [Hyperparater notation](#hyperparameter-notation)
+- [Module overview](#overview)
+- [The ray.tune.search hyperparameter API](#ray-api)
 - [Creating a search space](#search-space)
 - [The model-building function](#builder)
 - [The data loader](#dataloader)
@@ -40,61 +40,70 @@ Each configuration sampled from the search space defines a *trial*. During the t
 
 Additional discussion of these concepts can be found in the [key concepts](https://docs.ray.io/en/latest/tune/key-concepts.html) documentation of Ray Tune.
 
-## Hyperparameter notation <a name="hyperparameter-notation"></a>
+## Module overview <a name="overview"></a>
 
-Glimr uses a simplified convention to represent the range of possible search spaces [provided by Ray Tune](https://docs.ray.io/en/latest/tune/api/search_space.html#tune-search-space). Two options are offered:
-1. `list` defines a uniformly-sampled interval of numerics like `int` or `float`.
-2. `set` defines a random choice among discrete options like gradient descent algorithm.
+Glimr consists of four modules:
+1. `search` implements the `Search` class that is used to run trials and experiments. This class contains all the details of configuring Ray Tune checkpointing, reporting, and model training behavior. 
+2. `utils` contains functions to help users build and work with search spaces. This module will be expanded in the future.
+3. `keras` contains functions to help with model building logic, and simplify the process of building data structures that keras needs to compile models with losses, metrics, and optimization algorithms.
+4. `optimization` implements a default search space for gradient optimizers.
 
-The `list` notation defines the lower and upper interval range, with an optional quantization. Depending on whether `float` or `int` arguments are provided, this will map to the Ray Tune search space API functions [`ray.tune.uniform`](https://docs.ray.io/en/latest/tune/api/doc/ray.tune.uniform.html#ray.tune.uniform)/[`ray.tune.quniform`](https://docs.ray.io/en/latest/tune/api/doc/ray.tune.quniform.html#ray.tune.quniform) or [`ray.tune.randint`](https://docs.ray.io/en/latest/tune/api/doc/ray.tune.randint.html#ray.tune.randint)/[`ray.tune.qrandint`](https://docs.ray.io/en/latest/tune/api/doc/ray.tune.qrandint.html#ray.tune.qrandint). If no quantization is provided, the interval will be divided in ten segments.
+## The ray.tune.search hyperparameter API]<a name="ray-api"></a>
+
+Glimr uses the [Ray Tune search space API](https://docs.ray.io/en/latest/tune/api/search_space.html#tune-search-space) to represent hyperparameters. This API provides a set of functions for defining range/interval hyperparameters for things like learning rate or layers/units as well as discrete choice parameters for things like gradient optimization. Commonly used functions for `float` or `int` range parameters include [`ray.tune.uniform`](https://docs.ray.io/en/latest/tune/api/doc/ray.tune.uniform.html#ray.tune.uniform)/[`ray.tune.quniform`](https://docs.ray.io/en/latest/tune/api/doc/ray.tune.quniform.html#ray.tune.quniform) or [`ray.tune.randint`](https://docs.ray.io/en/latest/tune/api/doc/ray.tune.randint.html#ray.tune.randint)/[`ray.tune.qrandint`](https://docs.ray.io/en/latest/tune/api/doc/ray.tune.qrandint.html#ray.tune.qrandint). 
 
 ```python
-# defines a parameter interval from 0. to 20. with quantization 2.
-{"parameter": [0., 20.]}
+# a uniformly distributed float hyperparameter in the range [0., 1.]
+hp1 = ray.tune.uniform(0., 1.)
 
-# defines a parameter with the same interval but with quantization 1.
-{"parameter": [0., 20., 1.]}
+# a uniformly distributed float hyperparameter in the range [0., 1.] with quantization 0.1
+hp2 = ray.tune.quniform(0., 1., 0.1)
+
+# a uniformly distributed int hyperparameter in the range [0, 10] (quantization 1)
+hp3 = ray.tune.randint(0, 10, 1)
+
+#  a uniformly distributed int hyperparameter in the range [0, 10] with quantization 2
+hp4 = ray.tune.qrandint(0, 10, 2)
 ```
 
-The `set` notation can be used with any types, with each option being equally likely to be selected. This maps to the [`ray.tune.choice`](https://docs.ray.io/en/latest/tune/api/doc/ray.tune.choice.html#ray.tune.choice) function from the Ray Tune search space API.
+Other options for range parameters include logarithmic interval spacing.
+
+For discrete hyperparameter [`ray.tune.choice`](https://docs.ray.io/en/latest/tune/api/doc/ray.tune.choice.html#ray.tune.choice) provides random sampling.
 
 ```python
 # choose between stochastic-gradient descent and adam
-{"gradient_alg": {"sgd", "adam"}}
-
-# select among log-spaced values for learning rate
-{"learning_rate": {1e-5, 1e-4, 1e-3, 1e-2}}
+gradient_alg = tune.choice(["sgd", "adam"])
 ```
-
-**Note:**
-> Advanced users can override this notation and instead directly use the [Ray Tune search space API functions](https://docs.ray.io/en/latest/tune/api/search_space.html#tune-search-space). Mapping from `list` and `set` is performed by the [`set_hyperparameter()`](https://github.com/cooperlab/glimr/blob/abefc5820a873691d396001d43d883ce416d429b/glimr/search/utils.py#L239) function.
 
 ## Creating a search space <a name="search-space"></a>
 
-A search space is simply a dictionary of hyperparameters. Dictionaries can be nested to improve organiziation by separating elements of the space. For example, here is a hypothetical search space for a simple two-layer network that searches the units, activation functions, and dropout for each layer, along with training hyperparameters:
+A search space is simply a dictionary of hyperparameters and other fixed values. Dictionaries can be nested to improve organiziation by separating elements of the space. For example, here is a hypothetical search space for a simple two-layer network that searches the units, activation functions, and dropout for each layer, along with training hyperparameters:
 
 ```python
 search = {
   layer1: {
-    activation: ["relu", "gelu"],
-    dropout: [0.0, 0.5, 0.05],
-    units: {64, 48, 32, 16},
+    activation: tune.choice(["relu", "gelu"]),
+    dropout: tune.quniform(0.0, 0.5, 0.05),
+    units: tune.choice([64, 48, 32, 16]),
   }
   layer2: {
-    activation: ["relu", "gelu"],
-    dropout: [0.0, 0.5, 0.05],
-    units: {64, 48, 32, 16},
+    activation: tune.choice(["relu", "gelu"]),
+    dropout: tune.quniform(0.0, 0.5, 0.05),
+    units: tune.choice([64, 48, 32, 16]),
   }
   optimization: {
-    batch={32, 64, 128},
-    method={"rms", "sgd"},
-    learning_rate=[1e-5, 1e-2, 1e-5],
-    momentum=[0.0, 1e-1, 1e-2]
+    batch= tune.choice([32, 64, 128]),
+    method= tune.choice(["rms", "sgd"]),
+    learning_rate= tune.quniform(1e-5, 1e-2, 1e-5),
+    momentum= tune.quniform(0.0, 1e-1, 1e-2)
+  }
+  data: {
+    "batch_size": tune.choice([32, 64, 128])
   }
 }
 ```
 
-If we want to set a specific hyperparameter value, we can simply assign this value outside of the `list`/`set` notation:
+To set a fixed hyperparameter simply assign this value without the search API function:
 
 ```python
 layer2: {
@@ -105,42 +114,56 @@ layer2: {
 ```
 
 **Note:**
->Configuration values must be pickleable for Ray Tune to pass configurations to its workers. For this reason, callables like losses or metrics that are not pickleable have to be encoded as strings and decoded in the model building function. In the simple example above, that leads us to use `sgd` instead of `tf.keras.optimizers.experimental.SGD`. When we write the model builder function, we can decode the string to produce the optmizer object.
+>Configuration values must be pickleable for Ray Tune to pass configurations to its workers. For this reason, callables like losses or metrics that are not pickleable have to be encoded as strings and decoded in the model building function inside the worker process. In the simple example above, that leads us to use `sgd` instead of `tf.keras.optimizers.experimental.SGD`. When we write the model builder function, we can decode the string to produce the optmizer object using a dict to map between strings and their objects.
 
 ### Required elements
 
 Glimre is flexible and can be used with a wide variety of models, due to the user-defined configurations and model builder functions. There are some required elements of the search space, however. These constraints are implemented in [`glimr.Search.trainiable()`](https://github.com/PathologyDataScience/survivalnet2/blob/1b3c2ac4d6866e3eabdbc85063cd20df62aed292/survivalnet2/search/search.py#L297) which is used to build run each trial.
 
 #### Tasks
-Terminal model outputs/layers must be captured as values in a `tasks` key that is located at the top level of the space. This is required to support multi-task models and to correctly assign metrics and losses to model outputs. Each key in `tasks` defines a task name, and a value defining the loss, loss weight, and metrics for that task. For example, from our model above, we can define the second layer as a task:
+Terminal model outputs/layers must be captured as values in a `tasks` key that is located at the top level of the space. This is required to support multi-task models and to correctly assign metrics and losses to model outputs. Each key in `tasks` defines a task name, and each task requires a loss, loss weight, and metric. For example, from our model above, we can define the second layer as a task:
 
 ```python
+
 search = {
   layer1: {
-    activation: ["relu", "gelu"],
-    dropout: [0.0, 0.5, 0.05],
-    units: {64, 48, 32, 16},
+    activation: tune.choice(["relu", "gelu"]),
+    dropout: tune.quniform(0.0, 0.5, 0.05),
+    units: tune.choice([64, 48, 32, 16]),
   }
   tasks: {
     task1: {
-      activation: ["relu", "gelu"],
-      dropout: [0.0, 0.5, 0.05],
-      units: {64, 48, 32, 16},
-      loss="binary_crossentropy",
+      activation: tune.choice(["relu", "gelu"]),
+      dropout: tune.quniform(0.0, 0.5, 0.05),
+      units: tune.choice([64, 48, 32, 16]),
+      loss={"name": "binary_crossentropy"},
       loss_weight=1.0,
-      metrics={"f1": "f1_score"},
+      metrics={
+        "f1_score": {
+          "name": "f1",
+          "kwargs": {"threshold": 0.25},
+        }
+      }
     }
   }
   optimization: {
-    batch={32, 64, 128},
-    method={"rms", "sgd"},
-    learning_rate=[1e-5, 1e-2, 1e-5],
-    momentum=[0.0, 1e-1, 1e-2]
+    epochs = 100,
+    method= tune.choice(["rms", "sgd"]),
+    learning_rate= tune.quniform(1e-5, 1e-2, 1e-5),
+    momentum= tune.quniform(0.0, 1e-1, 1e-2)
+  }
+  data: {
+    "batch_size": tune.choice([32, 64, 128])
   }
 }
 ```
 
-Here, `metrics={"f1": "f1_score"}` defines a metric that will be registered as `f1` during model compilation, and the value `f1_score` can be decoded by your model builder to generate a `tf.keras.metrics.F1Score` object for compilation.
+metrics={"f1_score": {
+          "name": "f1",
+          "kwargs": {"threshold": 0.25},
+        }
+
+Here, `metrics={"f1_score": {"name": "f1"...` defines a metric that will be registered and displayed as `f1_score` during model compilation, and the value `f1` will be decoded by your model builder to generate a `tf.keras.metrics.F1Score` object for compilation. The `kwargs` allows customization of things like thresholds for metrics and losses.
 
 #### Data
 
@@ -174,6 +197,8 @@ Furthermore, these names have to be used when creating the `tf.keras.Model` obje
 named = {f"{name}": task for (name, task) in zip(config["tasks"].keys(), tasks)}
 model = tf.keras.Model(inputs=inputs, outputs=named)
 ```
+
+See the examples for more details.
 
 ## The data loader <a name="dataloader"></a>
 
