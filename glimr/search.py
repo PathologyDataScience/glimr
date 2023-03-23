@@ -129,9 +129,6 @@ class Search(object):
         # default FailureConfig
         self.failure_config = FailureConfig(max_failures=5)
 
-        # default reporter
-        self.set_reporter()
-
         # default ScalingConfig
         self.set_scaling()
 
@@ -183,7 +180,6 @@ class Search(object):
         metrics=None,
         parameters=None,
         jupyter=False,
-        sort_by_metric=True,
         max_report_frequency=30,
         **kwargs,
     ):
@@ -207,14 +203,14 @@ class Search(object):
             If running trials in Jupyter, selecting `True` will report updates
             in-place. If `False` reports will be periodically appended to
             command line output. Default value is False.
-        sort_by_metric : bool
-            If `True`, trials will be sorted by the single metric used to rank
-            experiments. Default value is True.
         max_report_frequency : int
             The number of seconds between updates. Default value is 30.
 
         Notes
         -----
+        We do not apply the "sort_by_metric" parameter, as this has been found to
+        interfere with running multiple experiments in the same session.
+        
         See https://docs.ray.io/en/latest/tune/api/reporters.html for details
         on reporting in ray tune.
         """
@@ -236,7 +232,6 @@ class Search(object):
         reporter_kwargs = {
             "metric_columns": metrics,
             "parameter_columns": parameters,
-            "sort_by_metric": sort_by_metric,
             "max_report_frequency": max_report_frequency,
             **kwargs,
         }
@@ -424,6 +419,9 @@ class Search(object):
             trainable = tune.with_resources(self.trainable, self.scaling_config)
         else:
             trainable = self.trainable
+            
+        # set flag indicating first experiment was run
+        self._first = True
 
         # run experiment
         tuner = tune.Tuner(
