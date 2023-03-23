@@ -1,4 +1,5 @@
 import datetime
+import os
 from ray import tune
 from ray.air import CheckpointConfig, ScalingConfig
 from ray.air.config import FailureConfig, RunConfig
@@ -179,12 +180,12 @@ class Search(object):
         self,
         metrics=None,
         parameters=None,
-        jupyter=False,
+        jupyter=True,
+        sort_by_metric=True,
         max_report_frequency=30,
         **kwargs,
     ):
         """Creates a reporter to display trial results and progress during tuning.
-
         Parameters
         ----------
         metrics : list(string)
@@ -202,15 +203,14 @@ class Search(object):
         jupyter : bool
             If running trials in Jupyter, selecting `True` will report updates
             in-place. If `False` reports will be periodically appended to
-            command line output. Default value is False.
+            command line output. Default value is True.
+        sort_by_metric : bool
+            If `True`, trials will be sorted by the single metric used to rank
+            experiments. Default value is True.
         max_report_frequency : int
             The number of seconds between updates. Default value is 30.
-
         Notes
         -----
-        We do not apply the "sort_by_metric" parameter, as this has been found to
-        interfere with running multiple experiments in the same session.
-        
         See https://docs.ray.io/en/latest/tune/api/reporters.html for details
         on reporting in ray tune.
         """
@@ -232,6 +232,7 @@ class Search(object):
         reporter_kwargs = {
             "metric_columns": metrics,
             "parameter_columns": parameters,
+            "sort_by_metric": sort_by_metric,
             "max_report_frequency": max_report_frequency,
             **kwargs,
         }
@@ -339,19 +340,14 @@ class Search(object):
         name=None,
         num_samples=100,
         max_concurrent_trials=8,
-        scheduler=AsyncHyperBandScheduler(
-            time_attr="training_iteration",
-            max_t=100,
-            grace_period=10,
-            stop_last_trials=False,
-        ),
+        scheduler=None,
         search_alg=None,
     ):
         """Run hyperparameter tuning experiment trials.
 
-        This can be called multiple times with different search spaces
-        definitions, model building functions, schedulers, and search
-        algorithms to perform experiments under different conditions.
+        It is recommended to run one experiment per Search instance. A
+        single instance can be used for multiple experiments but Ray Tune
+        may cause exceptions depending on the conditions.
 
         Parameters
         ----------
@@ -389,6 +385,15 @@ class Search(object):
         if name is None:
             name = f"{datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}"
 
+        # set scheduler if default
+        if scheduler is None:
+            scheduler = AsyncHyperBandScheduler(
+                time_attr="training_iteration",
+                max_t=100,
+                grace_period=10,
+                stop_last_trials=False,
+            )
+
         # create tune config
         tune_kwargs = {}
         tune_kwargs["max_concurrent_trials"] = max_concurrent_trials
@@ -419,7 +424,7 @@ class Search(object):
             trainable = tune.with_resources(self.trainable, self.scaling_config)
         else:
             trainable = self.trainable
-            
+
         # set flag indicating first experiment was run
         self._first = True
 
@@ -430,6 +435,37 @@ class Search(object):
             tune_config=tune_config,
             run_config=run_config,
         )
+        analysis = tuner.fit()
+
+        return analysis
+
+    @staticmethod
+    def restore(local_dir, name=None):
+        """Restart an interrupted experiment.
+
+        This function can restore an experiment that was halted to complete
+        unfinished trials.
+
+        Parameters
+        ----------
+        local_dir : str
+            The path where experiment results are stored. If `name` is None,
+            `local_dir` should include the experiment name. Otherwise it is
+            the same `local_dir` argument provided when starting the experiment.
+        name : str
+            The name for the experiment. When an experiment is run, results are
+            stored in local_dir/name. If `name` is None, `local_dir` is assumed
+            to contain the full local_dir/name path.
+        """
+
+        # form path
+        if name is None:
+            path = local_dir
+        else:
+            path = os.join(local_dir, name)
+
+        # run restore
+        tuner = tune.Tuner.restore(path=path)
         analysis = tuner.fit()
 
         return analysis
