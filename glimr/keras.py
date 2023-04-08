@@ -1,4 +1,5 @@
 import tensorflow as tf
+import types
 
 
 def keras_losses(config, mapper):
@@ -17,7 +18,7 @@ def keras_losses(config, mapper):
         or callable in `mapper`, and an optional "kwargs" dictionary defining
         keyword arguments for creating the loss.
     mapper : dict
-        A dict mapping metric names to tf.keras.losses.Loss objects.
+        A dict mapping metric names to tf.keras.losses.Loss of function objects.
 
     Returns
     -------
@@ -33,11 +34,14 @@ def keras_losses(config, mapper):
     losses = {}
     for task in config["tasks"]:
         fn = mapper[config["tasks"][task]["loss"]["name"]]
-        if "kwargs" in config["tasks"][task]["loss"]:
-            kwargs = config["tasks"][task]["loss"]["kwargs"]
+        if isinstance(fn, types.FunctionType):
+            losses[task] = fn
         else:
-            kwargs = {}
-        losses[task] = fn(**kwargs)
+            if "kwargs" in config["tasks"][task]["loss"]:
+                kwargs = config["tasks"][task]["loss"]["kwargs"]
+            else:
+                kwargs = {}
+            losses[task] = fn(**kwargs)
 
     # create loss weight dictionary
     weights = {name: config["tasks"][name]["loss_weight"] for name in config["tasks"]}
