@@ -16,7 +16,8 @@ def keras_losses(config, mapper):
         should have a "loss" key that links to a loss dictionary. The loss
         dictionary contains a "name" that indexes a tf.keras.losses.Loss object
         or callable in `mapper`, and an optional "kwargs" dictionary defining
-        keyword arguments for creating the loss.
+        keyword arguments for creating the loss. kwargs can inclulde tunable
+        hyperparameters defined using the ray tune search space API.
     mapper : dict
         A dict mapping metric names to tf.keras.losses.Loss of function objects.
 
@@ -104,30 +105,41 @@ def keras_metrics(config, mapper):
     return metrics
 
 
-def keras_optimizer(optimizer):
-    """Convert config options to a tf.keras.optimizers.Optimizer that can be used in
-    model compilation and training. Sets both the optimization method and hyperparameters.
+def keras_optimizer(config):
+    """Convert an optimizaiton configuration to a tf.keras.optimizers.Optimizer.
+
+    Parameters
+    ----------
+    config : dict
+        A configuration dictionary defining the optimization "method",
+        and parameters including "learning_rate", "momentum", and other
+        hyperparameters.
+        
+    Returns
+    -------
+    optimizer : tf.keras.optimizers.Optimizer
+        An optimizer for keras model compilation.
     """
 
-    def extract_args(optimizer, kws):
-        return {kw: optimizer[kw] for kw in kws if kw in optimizer.keys()}
+    def extract_args(config, kws):
+        return {kw: config[kw] for kw in kws if kw in config.keys()}
 
-    if optimizer["method"] == "rms":
+    if config["method"] == "rms":
         kws = ["learning_rate", "rho", "momentum", "epsilon", "centered"]
-        return tf.keras.optimizers.RMSprop(**extract_args(optimizer, kws))
-    elif optimizer["method"] == "sgd":
+        return tf.keras.optimizers.RMSprop(**extract_args(config, kws))
+    elif config["method"] == "sgd":
         kws = ["learning_rate", "momentum", "nesterov"]
-        return tf.keras.optimizers.SGD(**extract_args(optimizer, kws))
-    elif optimizer["method"] == "adadelta":
+        return tf.keras.optimizers.SGD(**extract_args(config, kws))
+    elif config["method"] == "adadelta":
         kws = ["learning_rate", "rho", "epsilon"]
-        return tf.keras.optimizers.Adadelta(**extract_args(optimizer, kws))
-    elif optimizer["method"] == "adagrad":
+        return tf.keras.optimizers.Adadelta(**extract_args(config, kws))
+    elif config["method"] == "adagrad":
         kws = ["learning_rate", "initial_accumulator_value", "epsilon"]
-        return tf.keras.optimizers.Adagrad(**extract_args(optimizer, kws))
-    elif optimizer["method"] == "adam":
+        return tf.keras.optimizers.Adagrad(**extract_args(config, kws))
+    elif config["method"] == "adam":
         kws = ["learning_rate", "beta_1", "beta_2", "epsilon", "amsgrad"]
-        return tf.keras.optimizers.Adam(**extract_args(optimizer, kws))
+        return tf.keras.optimizers.Adam(**extract_args(config, kws))
     else:
         raise ValueError(
-            "optimizer['method'] must be one of 'adadelta', 'adam', 'adagram', 'rms', or 'sgd'"
+            "config['method'] must be one of 'adadelta', 'adam', 'adagram', 'rms', or 'sgd'"
         )
