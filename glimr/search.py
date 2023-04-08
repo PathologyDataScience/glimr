@@ -186,6 +186,7 @@ class Search(object):
         **kwargs,
     ):
         """Creates a reporter to display trial results and progress during tuning.
+        
         Parameters
         ----------
         metrics : list(string)
@@ -209,6 +210,7 @@ class Search(object):
             experiments. Default value is True.
         max_report_frequency : int
             The number of seconds between updates. Default value is 30.
+
         Notes
         -----
         See https://docs.ray.io/en/latest/tune/api/reporters.html for details
