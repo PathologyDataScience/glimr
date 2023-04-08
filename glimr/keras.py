@@ -124,19 +124,19 @@ def keras_optimizer(config):
     def extract_args(config, kws):
         return {kw: config[kw] for kw in kws if kw in config.keys()}
 
-    if optimizer["method"] == "rms":
+    if config["method"] == "rms":
         kws = ["learning_rate", "rho", "momentum", "epsilon", "centered"]
         return tf.keras.optimizers.RMSprop(**extract_args(config, kws))
-    elif optimizer["method"] == "sgd":
+    elif config["method"] == "sgd":
         kws = ["learning_rate", "momentum", "nesterov"]
         return tf.keras.optimizers.SGD(**extract_args(config, kws))
-    elif optimizer["method"] == "adadelta":
+    elif config["method"] == "adadelta":
         kws = ["learning_rate", "rho", "epsilon"]
         return tf.keras.optimizers.Adadelta(**extract_args(config, kws))
-    elif optimizer["method"] == "adagrad":
+    elif config["method"] == "adagrad":
         kws = ["learning_rate", "initial_accumulator_value", "epsilon"]
         return tf.keras.optimizers.Adagrad(**extract_args(config, kws))
-    elif optimizer["method"] == "adam":
+    elif config["method"] == "adam":
         kws = ["learning_rate", "beta_1", "beta_2", "epsilon", "amsgrad"]
         return tf.keras.optimizers.Adam(**extract_args(config, kws))
     else:
