@@ -3,7 +3,6 @@ from ray import tune
 
 def optimization_space(
     epochs=100,
-    batch=tune.choice([32, 64, 128]),
     method=tune.choice(["rms", "sgd", "adadelta", "adagrad", "adam"]),
     learning_rate=tune.quniform(1e-5, 1e-2, 1e-5),
     rho=tune.quniform(0.5, 1.0, 1e-2),
@@ -23,8 +22,6 @@ def optimization_space(
     epochs : int
         The maximum number of epochs to train a model for. This can be overrided by the
         scheduler or by the `stopper` attribute of a `Search` object.
-    batch : set[int]
-        A set of batch sizes (int) to explore. Default value is {32, 64, 128}.
     method : set[string]
         A list of strings encoding the gradient optimization method. The strings in `method`
         are converted to tf.keras.optimizer objects during training by
@@ -54,7 +51,6 @@ def optimization_space(
     # convert to ray search space
     space = {
         "epochs": epochs,
-        "batch": batch,
         "method": method,
         "learning_rate": learning_rate,
         "rho": rho,
