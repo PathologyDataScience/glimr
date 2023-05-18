@@ -319,7 +319,7 @@ class Search(object):
         # epoch reporting of performance metrics - link keras metric names
         # to names displayed by ray in reporting
         report = {
-            f"{t}_{m}": f"val_{t}_{m}" if len(config["tasks"]) > 1 else f"val_{m}"
+            f"{t}_{m}": f"val_{t}_{m}" if len(model.outputs) > 1 else f"val_{m}"
             for t in config["tasks"]
             for m in config["tasks"][t]["metrics"]
         }
