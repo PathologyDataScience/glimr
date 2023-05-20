@@ -186,7 +186,7 @@ class Search(object):
         **kwargs,
     ):
         """Creates a reporter to display trial results and progress during tuning.
-        
+
         Parameters
         ----------
         metrics : list(string)

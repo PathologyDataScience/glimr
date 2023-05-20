@@ -1,3 +1,4 @@
+from tensorflow_addons.optimizers import MovingAverage
 import tensorflow as tf
 import types
 
@@ -105,6 +106,7 @@ def keras_metrics(config, mapper):
     return metrics
 
 
+# TODO: add support for other optimizers, e.g., AdamW
 def keras_optimizer(config):
     """Convert an optimizaiton configuration to a tf.keras.optimizers.Optimizer.
 
@@ -114,7 +116,7 @@ def keras_optimizer(config):
         A configuration dictionary defining the optimization "method",
         and parameters including "learning_rate", "momentum", and other
         hyperparameters.
-        
+
     Returns
     -------
     optimizer : tf.keras.optimizers.Optimizer
@@ -126,20 +128,26 @@ def keras_optimizer(config):
 
     if config["method"] == "rms":
         kws = ["learning_rate", "rho", "momentum", "epsilon", "centered"]
-        return tf.keras.optimizers.RMSprop(**extract_args(config, kws))
+        opt = tf.keras.optimizers.RMSprop(**extract_args(config, kws))
     elif config["method"] == "sgd":
         kws = ["learning_rate", "momentum", "nesterov"]
-        return tf.keras.optimizers.SGD(**extract_args(config, kws))
+        opt = tf.keras.optimizers.SGD(**extract_args(config, kws))
     elif config["method"] == "adadelta":
         kws = ["learning_rate", "rho", "epsilon"]
-        return tf.keras.optimizers.Adadelta(**extract_args(config, kws))
+        opt = tf.keras.optimizers.Adadelta(**extract_args(config, kws))
     elif config["method"] == "adagrad":
         kws = ["learning_rate", "initial_accumulator_value", "epsilon"]
-        return tf.keras.optimizers.Adagrad(**extract_args(config, kws))
+        opt = tf.keras.optimizers.Adagrad(**extract_args(config, kws))
     elif config["method"] == "adam":
         kws = ["learning_rate", "beta_1", "beta_2", "epsilon", "amsgrad"]
-        return tf.keras.optimizers.Adam(**extract_args(config, kws))
+        opt = tf.keras.optimizers.Adam(**extract_args(config, kws))
     else:
         raise ValueError(
             "config['method'] must be one of 'adadelta', 'adam', 'adagram', 'rms', or 'sgd'"
         )
+
+    if config["moving_average"]:
+        # TODO: allow extra kwargs to be passed to MovingAverage
+        return MovingAverage(opt, num_updates=5)
+    else:
+        return opt
