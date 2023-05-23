@@ -9,6 +9,9 @@ def optimization_space(
     momentum=tune.quniform(0.0, 1e-1, 1e-2),
     beta_1=tune.quniform(0.5, 1.0, 1e-2),
     beta_2=tune.quniform(0.5, 1.0, 1e-2),
+    use_ema=tune.choice([True, False]),
+    ema_momentum=tune.quniform(0.9, 0.99, 1e-2),
+    ema_overwrite_frequency=tune.choice([None, 1, 2, 3, 4, 5])
 ):
     """Generate a search space for a training and optimization parameters.
 
@@ -42,7 +45,19 @@ def optimization_space(
     beta_2 : float, ray.tune.search.sample.Float
         The range of beta_2 values for the adam optimizer. Default value is
         tune.quniform(0.5, 1.0, 1e-2).
-
+    use_ema : bool, ray.tune.search.sample.Categorical
+        Whether to use moving averaging of weights during training. Default value
+        is tune.choice([True, False]).
+    ema_momentum : float, ray.tune.search.sample.Float
+        How much to weight the average from prior iterations when calculating
+        updated model weights. Higher values will weight the prior iterations
+        more. Default value is tune.quniform(0.9, 0.99, 1e-2).        
+    ema_overwrite_frequency : int, ray.tune.search.sample.Categorical
+        How often to overwrite the model weights with the calculated average.
+        A value of None will overwrite once per epoch. Integer values will
+        overwrite after the specified number of batches. Default value is
+        tune.choice([None, 1, 2, 3, 4, 5]).
+    
     Returns
     -------
     task : dict
@@ -58,6 +73,9 @@ def optimization_space(
         "momentum": momentum,
         "beta_1": beta_1,
         "beta_2": beta_2,
+        "use_ema": use_ema,
+        "ema_momentum": ema_momentum,
+        "ema_overwrite_frequency": ema_overwrite_frequency
     }
 
     return space
