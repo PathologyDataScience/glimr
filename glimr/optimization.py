@@ -1,8 +1,6 @@
 from ray import tune
 
 
-# TODO: add support for other options, e.g., epsilon, centered, nesterov, initial_accumulator_value
-# perhaps figure out conditional tuning
 def optimization_space(
     epochs=100,
     method=tune.choice(["rms", "sgd", "adadelta", "adagrad", "adam"]),
@@ -11,7 +9,6 @@ def optimization_space(
     momentum=tune.quniform(0.0, 1e-1, 1e-2),
     beta_1=tune.quniform(0.5, 1.0, 1e-2),
     beta_2=tune.quniform(0.5, 1.0, 1e-2),
-    moving_average=tune.choice([True, False]),
 ):
     """Generate a search space for a training and optimization parameters.
 
@@ -45,9 +42,6 @@ def optimization_space(
     beta_2 : float, ray.tune.search.sample.Float
         The range of beta_2 values for the adam optimizer. Default value is
         tune.quniform(0.5, 1.0, 1e-2).
-    moving_average : bool, ray.tune.search.sample.Categorical
-        A bool indicating if the optimizer should take a moving average of
-        the model throughout training. Default value is tune.choice([True, False])
 
     Returns
     -------
@@ -64,7 +58,6 @@ def optimization_space(
         "momentum": momentum,
         "beta_1": beta_1,
         "beta_2": beta_2,
-        "moving_average": moving_average,
     }
 
     return space
