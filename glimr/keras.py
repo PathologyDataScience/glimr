@@ -114,7 +114,7 @@ def keras_optimizer(config):
         A configuration dictionary defining the optimization "method",
         and parameters including "learning_rate", "momentum", and other
         hyperparameters.
-        
+
     Returns
     -------
     optimizer : tf.keras.optimizers.Optimizer
