@@ -125,19 +125,58 @@ def keras_optimizer(config):
         return {kw: config[kw] for kw in kws if kw in config.keys()}
 
     if config["method"] == "rms":
-        kws = ["learning_rate", "rho", "momentum", "epsilon", "centered"]
-        return tf.keras.optimizers.RMSprop(**extract_args(config, kws))
+        kws = [
+            "learning_rate",
+            "rho",
+            "momentum",
+            "epsilon",
+            "centered",
+            "use_ema",
+            "ema_momentum",
+            "ema_overwrite_frequency",
+        ]
+        return tf.keras.optimizers.experimental.RMSprop(**extract_args(config, kws))
     elif config["method"] == "sgd":
-        kws = ["learning_rate", "momentum", "nesterov"]
-        return tf.keras.optimizers.SGD(**extract_args(config, kws))
+        kws = [
+            "learning_rate",
+            "momentum",
+            "nesterov",
+            "use_ema",
+            "ema_momentum",
+            "ema_overwrite_frequency",
+        ]
+        return tf.keras.optimizers.experimental.SGD(**extract_args(config, kws))
     elif config["method"] == "adadelta":
-        kws = ["learning_rate", "rho", "epsilon"]
-        return tf.keras.optimizers.Adadelta(**extract_args(config, kws))
+        kws = [
+            "learning_rate",
+            "rho",
+            "epsilon",
+            "use_ema",
+            "ema_momentum",
+            "ema_overwrite_frequency",
+        ]
+        return tf.keras.optimizers.experimental.Adadelta(**extract_args(config, kws))
     elif config["method"] == "adagrad":
-        kws = ["learning_rate", "initial_accumulator_value", "epsilon"]
-        return tf.keras.optimizers.Adagrad(**extract_args(config, kws))
+        kws = [
+            "learning_rate",
+            "initial_accumulator_value",
+            "epsilon",
+            "use_ema",
+            "ema_momentum",
+            "ema_overwrite_frequency",
+        ]
+        return tf.keras.optimizers.experimental.Adagrad(**extract_args(config, kws))
     elif config["method"] == "adam":
-        kws = ["learning_rate", "beta_1", "beta_2", "epsilon", "amsgrad"]
+        kws = [
+            "learning_rate",
+            "beta_1",
+            "beta_2",
+            "epsilon",
+            "amsgrad",
+            "use_ema",
+            "ema_momentum",
+            "ema_overwrite_frequency",
+        ]
         return tf.keras.optimizers.Adam(**extract_args(config, kws))
     else:
         raise ValueError(
