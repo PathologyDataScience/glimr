@@ -79,8 +79,10 @@ def keras_metrics(config):
     metrics = {}
     for task in config["tasks"]:
 
-        # get metric list for task
+        # get metric list for task - wrap in list if necessary
         task_metrics = config["tasks"][task]["metrics"]
+        if isinstance(task_metrics, dict):
+            task_metrics = [task_metrics]
 
         # get metric classes
         classes = [metric["metric"] for metric in task_metrics]
