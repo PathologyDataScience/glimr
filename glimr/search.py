@@ -198,8 +198,9 @@ class Search(object):
             Each key is an index into the configuration dictionary, and each
             value is the name this parameter will be displayed as. Nested
             parameters are indicated using a `/`. Default value of
-            `{"optimization/method": "method", "optimization/learning_rate": "learning rate"}`
-            will display the `config["optimization"]["method"]` as "method" and
+            `{"optimization/method": "method", "optimization/learning_rate": 
+            "learning rate"}` will display the 
+            `config["optimization"]["method"]` as "method" and
             `config["optimization"]["learning_rate"]` as "learning_rate".
         jupyter : bool
             If running trials in Jupyter, selecting `True` will report updates
@@ -217,13 +218,17 @@ class Search(object):
         on reporting in ray tune.
         """
 
-        # set metrics, parameters if None
+        # set metrics using task and metric names
         if metrics is None:
-            metrics = [
-                f"{t}_{m}"
-                for t in self._space["tasks"]
-                for m in self._space["tasks"][t]["metrics"]
-            ]
+            metrics = []
+            for task_name, task in self._space["tasks"].items():
+                if isinstance(task["metrics"], dict):
+                    metrics.append(f"{task_name}_{task['metrics']['name']}")
+                elif isinstance(task["metrics"], list):
+                    for metric in task["metrics"]:
+                        metrics.append(f"{task_name}_{metric['name']}")
+
+        # set display parameters
         if parameters is None:
             parameters = {
                 "optimization/method": "method",
