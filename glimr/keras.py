@@ -6,7 +6,7 @@ import tensorflow as tf
 def keras_losses(config):
     """Builds loss and loss weight dictionaries for tf.keras.Model.compile.
 
-    This creates loss class instances given class definitions and kwargs, and 
+    This creates loss class instances given class definitions and kwargs, and
     formats loss names appropriately for keras.
 
     Parameters
@@ -14,8 +14,8 @@ def keras_losses(config):
     config : dict
         A configuration containing tasks and their losses. Each task in config
         should have a "loss" key that links to a single dictionary defining the
-        loss name, loss class or callable, and a dictionary of loss kwargs. 
-        kwargs can inclulde tunable hyperparameters defined using the ray tune 
+        loss name, loss class or callable, and a dictionary of loss kwargs.
+        kwargs can inclulde tunable hyperparameters defined using the ray tune
         search space API.
 
     Returns
@@ -31,28 +31,23 @@ def keras_losses(config):
     # create loss dictionary
     losses = {}
     for task_name, task in config["tasks"].items():
-
         # check if kwargs in loss dictionary
         if "kwargs" in task["loss"]:
             kwargs = task["loss"]["kwargs"]
         else:
             kwargs = {}
-  
+
         # create loss object
         if inspect.isfunction(task["loss"]["loss"]):
             loss = partial(task["loss"]["loss"], **kwargs)
         elif inspect.isclass(task["loss"]["loss"]):
             loss = task["loss"]["loss"](**kwargs)
         else:
-            raise ValueError(
-                "task 'loss' must be a function or class."
-            )
+            raise ValueError("task 'loss' must be a function or class.")
         losses[task_name] = loss
 
     # create loss weight dictionary
-    weights = {
-        name: config["tasks"][name]["loss_weight"] for name in config["tasks"]
-    }
+    weights = {name: config["tasks"][name]["loss_weight"] for name in config["tasks"]}
 
     return losses, weights
 
@@ -60,7 +55,7 @@ def keras_losses(config):
 def keras_metrics(config):
     """Builds metric dictionaries for tf.keras.Model.compile.
 
-    This creates metric class instances given class definitions and kwargs, and 
+    This creates metric class instances given class definitions and kwargs, and
     formats metric names appropriately for keras.
 
     Parameters
@@ -81,7 +76,6 @@ def keras_metrics(config):
     # create a metric dictionary from the config
     metrics = {}
     for task in config["tasks"]:
-
         # get metric list for task - wrap in list if necessary
         task_metrics = config["tasks"][task]["metrics"]
         if isinstance(task_metrics, dict):
@@ -95,8 +89,7 @@ def keras_metrics(config):
 
         # get metric kwargs
         kwargs = [
-            metric["kwargs"] if "kwargs" in metric else {}
-            for metric in task_metrics
+            metric["kwargs"] if "kwargs" in metric else {} for metric in task_metrics
         ]
 
         # wrap metrics in a list if more than 1

@@ -190,16 +190,16 @@ class Search(object):
         Parameters
         ----------
         metrics : list(string)
-            A list of metrics to display during tuning. Format as `task_metric` 
-            where `task` is the task name and `metric` is the metric name from 
+            A list of metrics to display during tuning. Format as `task_metric`
+            where `task` is the task name and `metric` is the metric name from
             the model configuration.
         parameters : dict
             A dictionary of configuration parameters to display during tuning.
             Each key is an index into the configuration dictionary, and each
             value is the name this parameter will be displayed as. Nested
             parameters are indicated using a `/`. Default value of
-            `{"optimization/method": "method", "optimization/learning_rate": 
-            "learning rate"}` will display the 
+            `{"optimization/method": "method", "optimization/learning_rate":
+            "learning rate"}` will display the
             `config["optimization"]["method"]` as "method" and
             `config["optimization"]["learning_rate"]` as "learning_rate".
         jupyter : bool
