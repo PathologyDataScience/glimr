@@ -252,9 +252,9 @@ def test_search():
     )
     space["epochs"] = 10
     tuner = Search(space, advmtl_model, load_example, "osr_harrellsc")
-    results = tuner.experiment(local_dir=ROOT_TEST_DIR, 
-                               num_samples=1, 
-                               max_concurrent_trials=1)
+    results = tuner.experiment(
+        local_dir=ROOT_TEST_DIR, num_samples=1, max_concurrent_trials=1
+    )
 
     # build a specific config
     def sample(config):

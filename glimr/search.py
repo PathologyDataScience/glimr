@@ -190,16 +190,17 @@ class Search(object):
         Parameters
         ----------
         metrics : list(string)
-            A list of metrics to display during tuning. Metrics have the form
-            `task_metric` where `task` is the task name and `metric` is the metric
-            name from the model configuration.
+            A list of metrics to display during tuning. Format as `task_metric`
+            where `task` is the task name and `metric` is the metric name from
+            the model configuration.
         parameters : dict
             A dictionary of configuration parameters to display during tuning.
             Each key is an index into the configuration dictionary, and each
             value is the name this parameter will be displayed as. Nested
             parameters are indicated using a `/`. Default value of
-            `{"optimization/method": "method", "optimization/learning_rate": "learning rate"}`
-            will display the `config["optimization"]["method"]` as "method" and
+            `{"optimization/method": "method", "optimization/learning_rate":
+            "learning rate"}` will display the
+            `config["optimization"]["method"]` as "method" and
             `config["optimization"]["learning_rate"]` as "learning_rate".
         jupyter : bool
             If running trials in Jupyter, selecting `True` will report updates
@@ -217,13 +218,17 @@ class Search(object):
         on reporting in ray tune.
         """
 
-        # set metrics, parameters if None
+        # set metrics using task and metric names
         if metrics is None:
-            metrics = [
-                f"{t}_{m}"
-                for t in self._space["tasks"]
-                for m in self._space["tasks"][t]["metrics"]
-            ]
+            metrics = []
+            for task_name, task in self._space["tasks"].items():
+                if isinstance(task["metrics"], dict):
+                    metrics.append(f"{task_name}_{task['metrics']['name']}")
+                elif isinstance(task["metrics"], list):
+                    for metric in task["metrics"]:
+                        metrics.append(f"{task_name}_{metric['name']}")
+
+        # set display parameters
         if parameters is None:
             parameters = {
                 "optimization/method": "method",
@@ -318,12 +323,18 @@ class Search(object):
 
         # epoch reporting of performance metrics - link keras metric names
         # to names displayed by ray in reporting
-        report = {
-            f"{t}_{m}": f"val_{t}_{m}" if len(model.outputs) > 1 else f"val_{m}"
-            for t in config["tasks"]
-            for m in config["tasks"][t]["metrics"]
-        }
-
+        report = {}
+        for task_name, task in config["tasks"].items():
+            if isinstance(task["metrics"], dict):
+                metric_names = [task["metrics"]["name"]]
+            elif isinstance(task["metrics"], list):
+                metric_names = [metric["name"] for metric in task["metrics"]]
+            for metric_name in metric_names:
+                if len(model.outputs) > 1:
+                    keras_name = f"val_{task_name}_{metric_name}"
+                else:
+                    keras_name = f"val_{metric_name}"
+                report[f"{task_name}_{metric_name}"] = keras_name
         callback = TuneReportCheckpointCallback(report)
 
         # train the model for the desired epochs using the call back
