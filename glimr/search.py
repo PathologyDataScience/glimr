@@ -190,9 +190,9 @@ class Search(object):
         Parameters
         ----------
         metrics : list(string)
-            A list of metrics to display during tuning. Metrics have the form
-            `task_metric` where `task` is the task name and `metric` is the metric
-            name from the model configuration.
+            A list of metrics to display during tuning. Format as `task_metric` 
+            where `task` is the task name and `metric` is the metric name from 
+            the model configuration.
         parameters : dict
             A dictionary of configuration parameters to display during tuning.
             Each key is an index into the configuration dictionary, and each
@@ -323,12 +323,18 @@ class Search(object):
 
         # epoch reporting of performance metrics - link keras metric names
         # to names displayed by ray in reporting
-        report = {
-            f"{t}_{m}": f"val_{t}_{m}" if len(model.outputs) > 1 else f"val_{m}"
-            for t in config["tasks"]
-            for m in config["tasks"][t]["metrics"]
-        }
-
+        report = {}
+        for task_name, task in config["tasks"].items():
+            if isinstance(task["metrics"], dict):
+                metric_names = [task["metrics"]["name"]]
+            elif isinstance(task["metrics"], list):
+                metric_names = [metric["name"] for metric in task["metrics"]]
+            for metric_name in metric_names:
+                if len(model.outputs) > 1:
+                    keras_name = f"val_{metric_name}"
+                else:
+                    keras_name = f"val_{task_name}_{metric_name}"
+                report[f"{task_name}_{metric_name}"] = keras_name
         callback = TuneReportCheckpointCallback(report)
 
         # train the model for the desired epochs using the call back
