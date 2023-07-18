@@ -1,25 +1,22 @@
+from functools import partial
+import inspect
 import tensorflow as tf
-import types
 
 
-def keras_losses(config, mapper):
-    """A utility to build loss and loss weight dictionaries for
-    tf.keras.Model.compile.
+def keras_losses(config):
+    """Builds loss and loss weight dictionaries for tf.keras.Model.compile.
 
-    Given a configuration where task losses are defined as strings, convert the
-    strings to loss objects and format a dict for model compilation.
+    This creates loss class instances given class definitions and kwargs, and 
+    formats loss names appropriately for keras.
 
     Parameters
     ----------
     config : dict
         A configuration containing tasks and their losses. Each task in config
-        should have a "loss" key that links to a loss dictionary. The loss
-        dictionary contains a "name" that indexes a tf.keras.losses.Loss object
-        or callable in `mapper`, and an optional "kwargs" dictionary defining
-        keyword arguments for creating the loss. kwargs can inclulde tunable
-        hyperparameters defined using the ray tune search space API.
-    mapper : dict
-        A dict mapping metric names to tf.keras.losses.Loss of function objects.
+        should have a "loss" key that links to a single dictionary defining the
+        loss name, loss class or callable, and a dictionary of loss kwargs. 
+        kwargs can inclulde tunable hyperparameters defined using the ray tune 
+        search space API.
 
     Returns
     -------
@@ -31,42 +28,45 @@ def keras_losses(config, mapper):
         tf.keras.Model.compile.
     """
 
+    # check if kwargs in loss dictionary
+    if "kwargs" in config["tasks"][task]["loss"]:
+        kwargs = config["tasks"][task]["loss"]["kwargs"]
+    else:
+        kwargs = {}
+
     # create loss dictionary
     losses = {}
-    for task in config["tasks"]:
-        fn = mapper[config["tasks"][task]["loss"]["name"]]
-        if isinstance(fn, types.FunctionType):
-            losses[task] = fn
+    for task in config["tasks"]:        
+        if inspect.isfunction(config["tasks"][task]["loss"]["loss"]):
+            loss = partial(config["tasks"][task]["loss"]["loss"], **kwargs)
+        elif inspect.isclass(config["tasks"][task]["loss"]["loss"]):
+            loss = config["tasks"][task]["loss"]["loss"](**kwargs)
         else:
-            if "kwargs" in config["tasks"][task]["loss"]:
-                kwargs = config["tasks"][task]["loss"]["kwargs"]
-            else:
-                kwargs = {}
-            losses[task] = fn(**kwargs)
+            raise ValueError(
+                "task 'loss' must be a function or class."
+            )
 
     # create loss weight dictionary
-    weights = {name: config["tasks"][name]["loss_weight"] for name in config["tasks"]}
+    weights = {
+        name: config["tasks"][name]["loss_weight"] for name in config["tasks"]
+    }
 
     return losses, weights
 
 
-def keras_metrics(config, mapper):
-    """A utility to build metric dictionaries for tf.keras.Model.compile.
+def keras_metrics(config):
+    """Builds metric dictionaries for tf.keras.Model.compile.
 
-    Given a configuration where task metrics are defined as strings, convert
-    the strings to tf.keras.metrics.Metric objects and format a dict for model
-    compilation.
+    This creates metric class instances given class definitions and kwargs, and 
+    formats metric names appropriately for keras.
 
     Parameters
     ----------
     config : dict
-        A configuration defining the metrics for each task. Each task in config
-        should have a "metrics" key that links to a metrics dictionary. The
-        metrics dictionary contains a "name" that indexes a tf.keras.metrics.Metric
-        object in `mapper`, and an optional "kwargs" dictionary defining keyword
-        arguments for creating the metric.
-    mapper : dict
-        A dict mapping metric names to tf.keras.metrics.Metric objects.
+        A configuration containing tasks and their metrics. Each task in config
+        should have a "metrics" key that links to a list of dictionaries with
+        each dictionary defining a metric name, metric class, and a dictionary
+        of metric kwargs.
 
     Returns
     -------
@@ -78,23 +78,24 @@ def keras_metrics(config, mapper):
     # create a metric dictionary from the config
     metrics = {}
     for task in config["tasks"]:
-        # get task metric dictionary
+
+        # get metric list for task
         task_metrics = config["tasks"][task]["metrics"]
 
-        # get metric names for task
-        names = [task_metrics[metric]["name"] for metric in task_metrics]
+        # get metric classes
+        classes = [metric["metric"] for metric in task_metrics]
 
-        # get kwargs for these metrics
+        # get metric names - user-defined
+        names = [metric["name"] for metric in task_metrics]
+
+        # get metric kwargs
         kwargs = [
-            task_metrics[metric]["kwargs"] if "kwargs" in task_metrics[metric] else {}
+            metric["kwargs"] if "kwargs" in metric else {}
             for metric in task_metrics
         ]
 
-        # get user-defined display names for these metrics
-        display = list(task_metrics.keys())
-
         # wrap metrics in a list if more than 1
-        objects = [mapper[n](name=d, **k) for n, d, k in zip(names, display, kwargs)]
+        objects = [classes(name=n, **k) for n, k in zip(classes, names, kwargs)]
 
         # assign to metrics dict
         if len(names) > 1:
