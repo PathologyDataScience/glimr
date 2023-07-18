@@ -331,9 +331,9 @@ class Search(object):
                 metric_names = [metric["name"] for metric in task["metrics"]]
             for metric_name in metric_names:
                 if len(model.outputs) > 1:
-                    keras_name = f"val_{metric_name}"
-                else:
                     keras_name = f"val_{task_name}_{metric_name}"
+                else:
+                    keras_name = f"val_{metric_name}"
                 report[f"{task_name}_{metric_name}"] = keras_name
         callback = TuneReportCheckpointCallback(report)
 
