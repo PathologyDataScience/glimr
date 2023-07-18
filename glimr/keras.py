@@ -28,23 +28,26 @@ def keras_losses(config):
         tf.keras.Model.compile.
     """
 
-    # check if kwargs in loss dictionary
-    if "kwargs" in config["tasks"][task]["loss"]:
-        kwargs = config["tasks"][task]["loss"]["kwargs"]
-    else:
-        kwargs = {}
-
     # create loss dictionary
     losses = {}
-    for task in config["tasks"]:        
-        if inspect.isfunction(config["tasks"][task]["loss"]["loss"]):
-            loss = partial(config["tasks"][task]["loss"]["loss"], **kwargs)
-        elif inspect.isclass(config["tasks"][task]["loss"]["loss"]):
-            loss = config["tasks"][task]["loss"]["loss"](**kwargs)
+    for task_name, task in config["tasks"].items():
+
+        # check if kwargs in loss dictionary
+        if "kwargs" in task["loss"]:
+            kwargs = task["loss"]["kwargs"]
+        else:
+            kwargs = {}
+  
+        # create loss object
+        if inspect.isfunction(task["loss"]["loss"]):
+            loss = partial(task["loss"]["loss"], **kwargs)
+        elif inspect.isclass(task["loss"]["loss"]):
+            loss = task["loss"]["loss"](**kwargs)
         else:
             raise ValueError(
                 "task 'loss' must be a function or class."
             )
+        losses[task_name] = loss
 
     # create loss weight dictionary
     weights = {
@@ -97,7 +100,7 @@ def keras_metrics(config):
         ]
 
         # wrap metrics in a list if more than 1
-        objects = [classes(name=n, **k) for n, k in zip(classes, names, kwargs)]
+        objects = [c(name=n, **k) for c, n, k in zip(classes, names, kwargs)]
 
         # assign to metrics dict
         if len(names) > 1:
