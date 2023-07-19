@@ -1,4 +1,3 @@
-from functools import partial
 import inspect
 import tensorflow as tf
 
@@ -39,7 +38,9 @@ def keras_losses(config):
 
         # create loss object
         if inspect.isfunction(task["loss"]["loss"]):
-            loss = partial(task["loss"]["loss"], **kwargs)
+            if kwargs != {}:
+                raise ValueError("functional losses cannot use kwargs")
+            loss = task["loss"]["loss"]
         elif inspect.isclass(task["loss"]["loss"]):
             loss = task["loss"]["loss"](**kwargs)
         else:
