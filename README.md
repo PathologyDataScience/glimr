@@ -34,7 +34,7 @@ pip install glimr
 
 Ray Tune is a hyperparameter search library for building highly optmized models. A *hyperparameter* is any selected parameter used in the design or training of a model including but not limited to network architecture (depth, width, activations, topology), optimization (gradient algorithm, learning rate, scheduling), and other training parameters like losses and loss parameters. 
 
-A *search space* is the range of allowable hyperparameter selections that lead to a trained model. Hyperparameters can be drawn from an interval of values, or selected from a discrete set. For example, a model can may be allowed to have between two and six layers with learning rate ranging from 1e-5 to 1e-3. Glimr provides a simple way to define search spaces using basic `list` and `set` python types. To create a search space, users define a nested dictionary that describes the choices required to build their model. Ray samples this space to generate *model configurations* that correspond to different models to evaluate for fitness (see below).
+A *search space* is the range of allowable hyperparameter selections that lead to a trained model. Hyperparameters can be drawn from an interval of values, or selected from a discrete set. For example, a model can may be allowed to have between two and six layers with learning rate ranging from 1e-5 to 1e-3. Glimr provides a simple way to define search spaces by creating a nested dictionary that describes the choices required to build their model. Ray samples this space to generate *model configurations* that correspond to different models to evaluate for fitness (see below).
 
 Each configuration sampled from the search space defines a *trial*. During the trial, the model is built and trained to specification, and the performance of this model is evaluated and recorded. A collection of these trials is called an *experiment*. A *search algorithm* is a strategy for selecting trials to run. This could be a random or grid search where each trial is independent and highly parallelizable, or a more intelligent approach like *Bayesian optimization* that tries to sequentially sample the best configurations based on the outcome of previous trials. A *scheduler* allows early termination of less promising trials so that resources can be devoted to exploring more promising configurations.
 
@@ -136,13 +136,16 @@ search = {
       activation: tune.choice(["relu", "gelu"]),
       dropout: tune.quniform(0.0, 0.5, 0.05),
       units: tune.choice([64, 48, 32, 16]),
-      loss={"name": "binary_crossentropy"},
+      loss={
+          "name": "binary_crossentropy",
+          "loss": tf.keras.losses.BinaryCrossentropy
+      },
       loss_weight=1.0,
-      metrics={
-        "f1_score": {
+      metrics=[{
           "name": "f1",
+          "metric": tf.keras.metrics.F1Score
           "kwargs": {"threshold": 0.25},
-        }
+        }]
       }
     }
   }
@@ -158,12 +161,7 @@ search = {
 }
 ```
 
-metrics={"f1_score": {
-          "name": "f1",
-          "kwargs": {"threshold": 0.25},
-        }
-
-Here, `metrics={"f1_score": {"name": "f1"...` defines a metric that will be registered and displayed as `f1_score` during model compilation, and the value `f1` will be decoded by your model builder to generate a `tf.keras.metrics.F1Score` object for compilation. The `kwargs` allows customization of things like thresholds for metrics and losses.
+Here, `metrics=[{"name": "f1",...` defines a metric that will be registered and displayed as `f1` during model compilation, and the metric `tf.keras.metrics.F1Score` will be used with a object for compilation. The `kwargs` allows customization of things like thresholds for metrics and losses that are classes. Keyword arguments cannot be used with non-class metrics or losses.
 
 #### Data
 
