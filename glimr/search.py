@@ -113,8 +113,8 @@ class Search(object):
 
         # extract default optimization metric - first task & first metric
         if metric is None:
-            taskname = space["tasks"].keys()[0]
-            metricname = space["tasks"][taskname].keys()[0]
+            taskname = list(space["tasks"].keys())[0]
+            metricname = list(space["tasks"][taskname].keys())[0]
             self.metric = f"{taskname}_{metricname}"
         else:
             self.metric = metric
