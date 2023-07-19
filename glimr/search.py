@@ -478,7 +478,7 @@ class Search(object):
             path = os.join(local_dir, name)
 
         # run restore
-        tuner = tune.Tuner.restore(path=path)
+        tuner = tune.Tuner.restore(path, Search.trainable)
         analysis = tuner.fit()
 
         return analysis
