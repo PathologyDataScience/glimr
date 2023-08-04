@@ -3,7 +3,7 @@ import os
 import pandas as pd
 
 
-def get_top_k_trials(dir, metric=None, k=10, drop_dups=True, config_filter=None):
+def get_top_k_trials(exp_dir, metric=None, k=10, drop_dups=True, config_filter=None):
     """
     Returns the top k-many trials of a ray tune experiment as measured by a given metric.
 
@@ -12,7 +12,7 @@ def get_top_k_trials(dir, metric=None, k=10, drop_dups=True, config_filter=None)
 
     Parameters
     ----------
-    dir : str
+    exp_dir : str
         The directory path of the ongoing or saved ray tune experiment. This path should contain
         subdirectories with the prefix "trainable" for each trial conducted in the experiment.
     metric : str
@@ -41,10 +41,12 @@ def get_top_k_trials(dir, metric=None, k=10, drop_dups=True, config_filter=None)
         (as measued by the specified `metric`) of a ray tune experiment.
     """
     dataframes = []
-
-    for subdir in os.listdir(dir):
-        if subdir.startswith("trainable") and os.path.isdir(os.path.join(dir, subdir)):
-            json_path = os.path.join(dir, subdir, "result.json")
+    subdirs = os.listdir(exp_dir)
+    for subdir in subdirs:
+        if subdir.startswith("trainable") and os.path.isdir(
+            os.path.join(exp_dir, subdir)
+        ):
+            json_path = os.path.join(exp_dir, subdir, "result.json")
             if os.path.exists(json_path):
                 df = pd.read_json(json_path, lines=True)
                 dataframes.append(df)
@@ -67,7 +69,19 @@ def get_top_k_trials(dir, metric=None, k=10, drop_dups=True, config_filter=None)
     if k is not None and k < float("inf") and k < final_df.shape[0]:
         final_df = final_df.head(k)
 
-    metadata = ["trial_id", "training_iteration", "config", metric]
+    def _get_chckpt_path(trial_id, training_iteration):
+        subdir = [s for s in subdirs if s.startswith(f"trainable_{trial_id}")][0]
+        chckpt_num = f"checkpoint_{str(training_iteration - 1).zfill(6)}"
+        chckpt_path = os.path.join(exp_dir, subdir, chckpt_num, "")
+        if not os.path.exists(chckpt_path):
+            return None
+        return chckpt_path
+
+    final_df["checkpoint_path"] = [
+        _get_chckpt_path(id, it)
+        for id, it in zip(final_df["trial_id"], final_df["training_iteration"])
+    ]
+    metadata = ["trial_id", "training_iteration", "checkpoint_path", "config", metric]
     column_order = metadata + [col for col in df.columns if col not in metadata]
 
     return final_df[column_order]
