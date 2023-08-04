@@ -3,9 +3,7 @@ import os
 import pandas as pd
 
 
-def get_top_k_trials(
-    dir, metric="softmax_balanced", k=10, drop_dups=True, config_filter=None
-):
+def get_top_k_trials(dir, metric=None, k=10, drop_dups=True, config_filter=None):
     """
     Returns the top k-many trials of a ray tune experiment as measured by a given metric.
 
@@ -19,9 +17,11 @@ def get_top_k_trials(
         subdirectories with the prefix "trainable" for each trial conducted in the experiment.
     metric : str
         Used to specify the column in the dataframe that will be used for sorting the trials.
-        If `metric=None`, no sorting will take place. By default, `metric="softmax_balanced"`.
+        If `metric=None`, the metric will be taken as the first of the available metrics reported by
+        ray tune. By default, `metric=None`.
     k : int
-        The number of trials to retrieve. If `k=None`, all trials will be returned. By default, `k=10`.
+        The number of trials to retrieve. If `k=None` or `k=float("inf")`, all trials will be returned.
+        By default, `k=10`.
     drop_dups : bool
         A boolean flag determining whether duplicate trials should be dropped from the final dataframe.
         If set to True, only the first occurrence of each trial_id will be kept in the dataframe, and
@@ -51,10 +51,10 @@ def get_top_k_trials(
 
     final_df = pd.concat(dataframes, ignore_index=True)
 
-    if metric is not None:
-        final_df.sort_values(
-            by=metric, ascending=False, inplace=True, ignore_index=True
-        )
+    if metric is None:
+        metric = final_df.columns[0]
+
+    final_df.sort_values(by=metric, ascending=False, inplace=True, ignore_index=True)
 
     if drop_dups:
         final_df.drop_duplicates(
@@ -64,10 +64,10 @@ def get_top_k_trials(
     if config_filter is not None:
         final_df = final_df[final_df["config"].apply(lambda c: config_filter(c))]
 
-    if k is not None:
+    if k is not None and k < float("inf") and k < final_df.shape[0]:
         final_df = final_df.head(k)
 
-    metadata = ["trial_id", "training_iteration", "config"]
+    metadata = ["trial_id", "training_iteration", "config", metric]
     column_order = metadata + [col for col in df.columns if col not in metadata]
 
     return final_df[column_order]
