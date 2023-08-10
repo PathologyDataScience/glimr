@@ -41,10 +41,12 @@ class Search(object):
         The name of the metric to optimize. This is in the form "task_name"
         where "task" is the task name and "name" is the key value of the
         metric to optimize. Default value of `None` selects the first
-        metric of the first task.
+        metric of the first task. Loss can be used as a tuning metric by 
+        substituting "loss" for the metric name.
     mode : {"max", "min"}
         Either "max" or "min" indicating whether to maximize or minimize
-        the metric. Default value is "max".
+        the metric. Default value is "max". If using loss for tuning
+        "min" should be selected.
     fit_kwargs : dict
         Keyword arguments for tf.keras.model.fit. Allows customization of
         keras model training options. Default value is None.
@@ -52,9 +54,9 @@ class Search(object):
     Attributes
     ----------
     metric : str
-        The name of the metric to optimize. This is in the form "task_name"
+        The name of the metric or loss to optimize. This is in the form "task_name"
         where "task" is the task name and "name" is the key value of the
-        metric to optimize.
+        metric to optimize. If tuning against a loss the name is "loss".
     mode : str
         Either "max" or "min" indicating whether to maximize or minimize
         the metric.
@@ -153,10 +155,12 @@ class Search(object):
             The name of the metric to optimize. This is in the form "task_name"
             where "task" is the task name and "name" is the key value of the
             metric to optimize. Default value of `None` selects the first
-            metric of the first task.
+            metric of the first task. Loss can be used as a tuning metric by 
+            substituting "loss" for the metric name.
         mode : {"max", "min"}
             Either "max" or "min" indicating whether to maximize or minimize
-            the metric. Default value is "max".
+            the metric. Default value is "max". If using loss for tuning
+            "min" should be selected.
         num_to_keep : int
             The number of checkpoints to retain from each trial. Default value
             is 1.
@@ -190,9 +194,9 @@ class Search(object):
         Parameters
         ----------
         metrics : list(string)
-            A list of metrics to display during tuning. Format as `task_metric`
-            where `task` is the task name and `metric` is the metric name from
-            the model configuration.
+            A list of metrics or losses to display during tuning. Format as 
+            `task_metric` where `task` is the task name and `metric` is the metric 
+            name. If using a loss the format is `task_loss`.
         parameters : dict
             A dictionary of configuration parameters to display during tuning.
             Each key is an index into the configuration dictionary, and each
@@ -227,6 +231,7 @@ class Search(object):
                 elif isinstance(task["metrics"], list):
                     for metric in task["metrics"]:
                         metrics.append(f"{task_name}_{metric['name']}")
+                metrics.append(f"{task_name}_loss")
 
         # set display parameters
         if parameters is None:
@@ -323,6 +328,13 @@ class Search(object):
 
         # epoch reporting of performance metrics - link keras metric names
         # to names displayed by ray in reporting
+        # epoch reporting of performance metrics - link keras metric names
+        # to names displayed by ray in reporting
+        def kerasify(task, metric, multitask=False):
+            if multitask:
+                return f"{task}_{metric}"
+            else:
+                return f"{metric}"
         report = {}
         for task_name, task in config["tasks"].items():
             if isinstance(task["metrics"], dict):
@@ -330,11 +342,9 @@ class Search(object):
             elif isinstance(task["metrics"], list):
                 metric_names = [metric["name"] for metric in task["metrics"]]
             for metric_name in metric_names:
-                if len(model.outputs) > 1:
-                    keras_name = f"val_{task_name}_{metric_name}"
-                else:
-                    keras_name = f"val_{metric_name}"
-                report[f"{task_name}_{metric_name}"] = keras_name
+                report[f"{task_name}_{metric_name}"] = "val_" + \
+                    kerasify(task_name, metric_name, len(model.outputs)>1)
+            report[f"{task_name}_loss"] = "val_" + kerasify(task_name, "loss", len(model.outputs)>1)
         callback = TuneReportCheckpointCallback(report)
 
         # train the model for the desired epochs using the call back
