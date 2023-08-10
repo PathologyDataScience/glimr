@@ -227,6 +227,7 @@ class Search(object):
                 elif isinstance(task["metrics"], list):
                     for metric in task["metrics"]:
                         metrics.append(f"{task_name}_{metric['name']}")
+                metrics.append(f"{task_name}_loss")
 
         # set display parameters
         if parameters is None:
