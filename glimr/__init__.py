@@ -6,7 +6,7 @@ This package contains hyperparameter tuning tools
 from glimr.keras import keras_losses, keras_metrics, keras_optimizer
 from glimr.optimization import optimization_space
 from glimr.search import Search
-from glimr.utils import get_top_k_trials, sample_space
+from glimr.utils import get_top_k_trials, prune_constants, sample_space
 
 # list out things that are available for public use
 __all__ = (
@@ -17,5 +17,6 @@ __all__ = (
     "optimization_space",
     "get_top_k_trials",
     "sample_space",
+    "prune_constants",
     "Search",
 )
