@@ -323,6 +323,13 @@ class Search(object):
 
         # epoch reporting of performance metrics - link keras metric names
         # to names displayed by ray in reporting
+        # epoch reporting of performance metrics - link keras metric names
+        # to names displayed by ray in reporting
+        def kerasify(task, metric, multitask=False):
+            if multitask:
+                return f"{task}_{metric}"
+            else:
+                return f"{metric}"
         report = {}
         for task_name, task in config["tasks"].items():
             if isinstance(task["metrics"], dict):
@@ -330,11 +337,9 @@ class Search(object):
             elif isinstance(task["metrics"], list):
                 metric_names = [metric["name"] for metric in task["metrics"]]
             for metric_name in metric_names:
-                if len(model.outputs) > 1:
-                    keras_name = f"val_{task_name}_{metric_name}"
-                else:
-                    keras_name = f"val_{metric_name}"
-                report[f"{task_name}_{metric_name}"] = keras_name
+                report[f"{task_name}_{metric_name}"] = "val_" + \
+                    kerasify(task_name, metric_name, len(model.outputs)>1)
+            report[f"{task_name}_loss"] = "val_" + kerasify(task_name, "loss", len(model.outputs)>1)
         callback = TuneReportCheckpointCallback(report)
 
         # train the model for the desired epochs using the call back
