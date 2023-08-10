@@ -1,4 +1,90 @@
 from ray.tune.search import sample
+import os
+import pandas as pd
+
+
+def get_top_k_trials(exp_dir, metric=None, k=10, drop_dups=True, config_filter=None):
+    """
+    Returns the top k-many trials of a ray tune experiment as measured by a given metric.
+
+    Given the directory path of a ray tune experiment as input, this function returns the top k-many
+    trials of the experiment based on a specified metric, while also allowing for custom filtering options.
+
+    Parameters
+    ----------
+    exp_dir : str
+        The directory path of the ongoing or saved ray tune experiment. This path should contain
+        subdirectories with the prefix "trainable" for each trial conducted in the experiment.
+    metric : str
+        Used to specify the column in the dataframe that will be used for sorting the trials.
+        If `metric=None`, the metric will be taken as the first of the available metrics reported by
+        ray tune. By default, `metric=None`.
+    k : int
+        The number of trials to retrieve. If `k=None` or `k=float("inf")`, all trials will be returned.
+        By default, `k=10`.
+    drop_dups : bool
+        A boolean flag determining whether duplicate trials should be dropped from the final dataframe.
+        If set to True, only the first occurrence of each trial_id will be kept in the dataframe, and
+        therefore each trial will be represented by its best performing epoch as determined by `metric`.
+        If set to False, then many epochs of a single trial could (in theory) be included in the final
+        dataframe, depending on their performance. By default, `drop_dups=True`.
+    config_filter : function
+        An optional function that can be used to filter the rows of the dataframe based on the values in
+        the config dictionary of a ray tune experiment trial. The given function must take a single
+        argument, the dictionary representing the configuration of a trial, and must return a boolean
+        value indicating whether the trial should be included or not. By default, `config_filter=None`.
+
+    Returns
+    -------
+    final_df : pandas.DataFrame
+        a pandas DataFrame containing performance metrics and metadata detailing the top k trials
+        (as measued by the specified `metric`) of a ray tune experiment.
+    """
+    dataframes = []
+    subdirs = os.listdir(exp_dir)
+    for subdir in subdirs:
+        if subdir.startswith("trainable") and os.path.isdir(
+            os.path.join(exp_dir, subdir)
+        ):
+            json_path = os.path.join(exp_dir, subdir, "result.json")
+            if os.path.exists(json_path):
+                df = pd.read_json(json_path, lines=True)
+                dataframes.append(df)
+
+    final_df = pd.concat(dataframes, ignore_index=True)
+
+    if metric is None:
+        metric = final_df.columns[0]
+
+    final_df.sort_values(by=metric, ascending=False, inplace=True, ignore_index=True)
+
+    if drop_dups:
+        final_df.drop_duplicates(
+            subset="trial_id", keep="first", inplace=True, ignore_index=True
+        )
+
+    if config_filter is not None:
+        final_df = final_df[final_df["config"].apply(lambda c: config_filter(c))]
+
+    if k is not None and k < float("inf") and k < final_df.shape[0]:
+        final_df = final_df.head(k)
+
+    def _get_chckpt_path(trial_id, training_iteration):
+        subdir = [s for s in subdirs if s.startswith(f"trainable_{trial_id}")][0]
+        chckpt_num = f"checkpoint_{str(training_iteration - 1).zfill(6)}"
+        chckpt_path = os.path.join(exp_dir, subdir, chckpt_num, "")
+        if not os.path.exists(chckpt_path):
+            return None
+        return chckpt_path
+
+    final_df["checkpoint_path"] = [
+        _get_chckpt_path(id, it)
+        for id, it in zip(final_df["trial_id"], final_df["training_iteration"])
+    ]
+    metadata = ["trial_id", "training_iteration", "checkpoint_path", "config", metric]
+    column_order = metadata + [col for col in df.columns if col not in metadata]
+
+    return final_df[column_order]
 
 
 def prune_constants(space):
