@@ -41,7 +41,7 @@ class Search(object):
         The name of the metric to optimize. This is in the form "task_name"
         where "task" is the task name and "name" is the key value of the
         metric to optimize. Default value of `None` selects the first
-        metric of the first task. Loss can be used as a tuning metric by 
+        metric of the first task. Loss can be used as a tuning metric by
         substituting "loss" for the metric name.
     mode : {"max", "min"}
         Either "max" or "min" indicating whether to maximize or minimize
@@ -155,7 +155,7 @@ class Search(object):
             The name of the metric to optimize. This is in the form "task_name"
             where "task" is the task name and "name" is the key value of the
             metric to optimize. Default value of `None` selects the first
-            metric of the first task. Loss can be used as a tuning metric by 
+            metric of the first task. Loss can be used as a tuning metric by
             substituting "loss" for the metric name.
         mode : {"max", "min"}
             Either "max" or "min" indicating whether to maximize or minimize
@@ -194,8 +194,8 @@ class Search(object):
         Parameters
         ----------
         metrics : list(string)
-            A list of metrics or losses to display during tuning. Format as 
-            `task_metric` where `task` is the task name and `metric` is the metric 
+            A list of metrics or losses to display during tuning. Format as
+            `task_metric` where `task` is the task name and `metric` is the metric
             name. If using a loss the format is `task_loss`.
         parameters : dict
             A dictionary of configuration parameters to display during tuning.
@@ -335,6 +335,7 @@ class Search(object):
                 return f"{task}_{metric}"
             else:
                 return f"{metric}"
+
         report = {}
         for task_name, task in config["tasks"].items():
             if isinstance(task["metrics"], dict):
@@ -342,9 +343,12 @@ class Search(object):
             elif isinstance(task["metrics"], list):
                 metric_names = [metric["name"] for metric in task["metrics"]]
             for metric_name in metric_names:
-                report[f"{task_name}_{metric_name}"] = "val_" + \
-                    kerasify(task_name, metric_name, len(model.outputs)>1)
-            report[f"{task_name}_loss"] = "val_" + kerasify(task_name, "loss", len(model.outputs)>1)
+                report[f"{task_name}_{metric_name}"] = "val_" + kerasify(
+                    task_name, metric_name, len(model.outputs) > 1
+                )
+            report[f"{task_name}_loss"] = "val_" + kerasify(
+                task_name, "loss", len(model.outputs) > 1
+            )
         callback = TuneReportCheckpointCallback(report)
 
         # train the model for the desired epochs using the call back
