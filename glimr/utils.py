@@ -104,6 +104,43 @@ def get_top_k_trials(
 
     return final_df[column_order]
 
+def get_trial_info(exp_dir, metric=None):
+    """
+    Given the directory path of a ray tune experiment as input, this function returns data on each trial 
+    as specified by the given metric(es). If metric is `None`, a generic dataframe containing all
+    trial information is returned.
+
+    Parameters
+    ----------
+    exp_dir : str
+        The directory path of the ongoing or saved ray tune experiment. This path should contain
+        subdirectories with the prefix "trainable" for each trial conducted in the experiment.
+    metric : list
+        List of metric(es) used to query from all trial information. Loss value is a valid metric.
+        If `None`, all trial information is returned
+    Returns
+    ----------
+    queried: pandas.DataFrame
+        A pandas DataFrame containing performance metrics of the all trials of a ray tune experiment.
+    """
+    dataframes = []
+    subdirs = os.listdir(exp_dir)
+    for subdir in subdirs:
+        if subdir.startswith("trainable") and os.path.isdir(
+            os.path.join(exp_dir, subdir)
+        ):
+            result_path = os.path.join(exp_dir, subdir, "result.json")
+            if os.path.exists(result_path):
+                df = pd.read_json(result_path, lines=True)
+                dataframes.append(df[df.loc[:,"done"]==True])
+    queried = pd.concat(dataframes, ignore_index=True) 
+    columns = queried.columns
+    if metric is not None:
+        bool_list = [True if i in columns else False for i in metric]
+        if not all(bool_list):
+            raise ValueError(f"{metric[bool_list.index(False)]} is not a valid metric")
+        queried = queried.loc[:,metric]
+    return queried
 
 def prune_constants(space):
     """Prepares a search space for ray tune's PBT scheduler by pruning constants.
