@@ -3,7 +3,9 @@ import os
 import pandas as pd
 
 
-def get_top_k_trials(exp_dir, metric=None, k=10, drop_dups=True, config_filter=None):
+def get_top_k_trials(
+    exp_dir, metric=None, mode="max", k=10, drop_dups=True, config_filter=None
+):
     """
     Returns the top k-many trials of a ray tune experiment as measured by a given metric.
 
@@ -19,9 +21,11 @@ def get_top_k_trials(exp_dir, metric=None, k=10, drop_dups=True, config_filter=N
         Used to specify the column in the dataframe that will be used for sorting the trials.
         If `metric=None`, the metric will be taken as the first of the available metrics reported by
         ray tune. By default, `metric=None`.
+    mode : str
+        Specifies whether to report the k-most maximum or k-most minimum trials as measured by
+        the provided `metric`. Must be one of "max" or "min". By default, `mode="max"`.
     k : int
-        The number of trials to retrieve. If `k=None` or `k=float("inf")`, all trials will be returned.
-        By default, `k=10`.
+        The number of trials to retrieve. If `k=None` all trials will be returned. By default, `k=10`.
     drop_dups : bool
         A boolean flag determining whether duplicate trials should be dropped from the final dataframe.
         If set to True, only the first occurrence of each trial_id will be kept in the dataframe, and
@@ -40,6 +44,13 @@ def get_top_k_trials(exp_dir, metric=None, k=10, drop_dups=True, config_filter=N
         a pandas DataFrame containing performance metrics and metadata detailing the top k trials
         (as measued by the specified `metric`) of a ray tune experiment.
     """
+
+    if mode not in ["max", "min"]:
+        raise ValueError("Argument mode must be one of 'max' or 'min'.")
+
+    if k is not None and (not isinstance(k, int) or k < 1):
+        raise ValueError("Argument k must be a positive integer or None.")
+
     dataframes = []
     subdirs = os.listdir(exp_dir)
     for subdir in subdirs:
@@ -53,10 +64,17 @@ def get_top_k_trials(exp_dir, metric=None, k=10, drop_dups=True, config_filter=N
 
     final_df = pd.concat(dataframes, ignore_index=True)
 
+    if metric is not None and metric not in final_df.columns:
+        raise ValueError(
+            f"Argument metric must be None or one of {final_df.columns.tolist()}."
+        )
+
     if metric is None:
         metric = final_df.columns[0]
 
-    final_df.sort_values(by=metric, ascending=False, inplace=True, ignore_index=True)
+    final_df.sort_values(
+        by=metric, ascending=(mode == "min"), inplace=True, ignore_index=True
+    )
 
     if drop_dups:
         final_df.drop_duplicates(
@@ -66,7 +84,7 @@ def get_top_k_trials(exp_dir, metric=None, k=10, drop_dups=True, config_filter=N
     if config_filter is not None:
         final_df = final_df[final_df["config"].apply(lambda c: config_filter(c))]
 
-    if k is not None and k < float("inf") and k < final_df.shape[0]:
+    if k is not None and k < final_df.shape[0]:
         final_df = final_df.head(k)
 
     def _get_chckpt_path(trial_id, training_iteration):
