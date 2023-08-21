@@ -21,7 +21,7 @@ classifiers=[
 license = {text = "Apache-2.0"}
 dependencies = [
     "ray[air,tune]>=2.3.0",
-    "tensorflow>=2.11"
+    "tensorflow-macos>=2.11"
 ]
 dynamic = ["version"]
 
