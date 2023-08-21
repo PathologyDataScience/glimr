@@ -37,6 +37,10 @@ class Search(object):
         of type tf.data.Dataset. This function should include a "batch"
         keyword argument and may include other keyword arguments to control
         data loading and preprocessing behavior.
+    stopper : ray.tune.Stopper
+        Defines the stopping criteria for terminating trials. May be overrided
+        by scheduler stopping criteria. Default value of `None` selects ray's
+        TrialPlateauStopper.
     metric : str
         The name of the metric to optimize. This is in the form "task_name"
         where "task" is the task name and "name" is the key value of the
@@ -96,6 +100,7 @@ class Search(object):
         space,
         builder,
         loader,
+        stopper=None,
         metric=None,
         mode="max",
         loader_kwargs=None,
@@ -136,7 +141,14 @@ class Search(object):
         self.set_scaling()
 
         # default trial/experiment stopper
-        self.stopper = TrialPlateauStopper(metric=self.metric)
+        if stopper is None:
+            self.stopper = TrialPlateauStopper(metric=self.metric)
+        else:
+            if not isinstance(stopper, tune.Stopper):
+                raise ValueError(
+                    "stopper must be a ray.tune.Stopper object. For example: TrialPlateauStopper, MaximumIterationStopper, ExperimentPlateauStopper, TimeOutStopper, etc."
+                )
+            self.stopper = stopper
 
         # default SyncConfig
         self.sync_config = SyncConfig(syncer=None)
