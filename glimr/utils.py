@@ -125,6 +125,7 @@ def get_trial_info(exp_dir, metric=None):
     """
     dataframes = []
     subdirs = os.listdir(exp_dir)
+    counter = 1
     for subdir in subdirs:
         if subdir.startswith("trainable") and os.path.isdir(
             os.path.join(exp_dir, subdir)
@@ -132,7 +133,9 @@ def get_trial_info(exp_dir, metric=None):
             result_path = os.path.join(exp_dir, subdir, "result.json")
             if os.path.exists(result_path):
                 df = pd.read_json(result_path, lines=True)
-                dataframes.append(df[df.loc[:,"done"]==True])
+                df.insert(0, 'trial_#', counter)
+                dataframes.append(df)
+                counter += 1
     queried = pd.concat(dataframes, ignore_index=True) 
     columns = queried.columns
     if metric is not None:
