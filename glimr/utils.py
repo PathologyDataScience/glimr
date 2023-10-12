@@ -59,7 +59,7 @@ def get_top_k_trials(
         ):
             json_path = os.path.join(exp_dir, subdir, "result.json")
             if os.path.exists(json_path):
-                df = pd.read_json(json_path, lines=True)
+                df = pd.read_json(json_path, dtype=False, lines=True)
                 dataframes.append(df)
 
     final_df = pd.concat(dataframes, ignore_index=True)
