@@ -3,12 +3,14 @@ import os
 from ray import tune
 from ray.air import CheckpointConfig, ScalingConfig
 from ray.air.config import FailureConfig, RunConfig
+from ray.air.integrations.keras import ReportCheckpointCallback
 from ray.tune import CLIReporter, JupyterNotebookReporter, SyncConfig
-from ray.tune.integration.keras import TuneReportCheckpointCallback
 from ray.tune.schedulers import AsyncHyperBandScheduler
 from ray.tune.stopper import TrialPlateauStopper
 from ray.tune.tune_config import TuneConfig
+from ray.train.tensorflow import TensorflowTrainer
 from glimr.keras import keras_optimizer
+import tensorflow as tf
 
 
 class Search(object):
@@ -116,6 +118,7 @@ class Search(object):
         space["builder"] = builder
         space["fit_kwargs"] = fit_kwargs
         space["loader"] = loader
+        space = {'train_loop_config': dict( [ (k,v) for k, v in space.items() ] )}
         self._space = space
 
         # extract default optimization metric - first task & first metric
@@ -324,16 +327,18 @@ class Search(object):
             as well as functions for data loading and model building.
         """
 
-        # create the model from the config
-        model, losses, loss_weights, metrics = config["builder"](config)
+        strategy = tf.distribute.MultiWorkerMirroredStrategy()
+        with strategy.scope():
+            # create the model from the config
+            model, losses, loss_weights, metrics = config["builder"](config)
 
-        # build optimizer
-        optimizer = keras_optimizer(config["optimization"])
+            # build optimizer
+            optimizer = keras_optimizer(config["optimization"])
 
-        # compile the model with the optimizer, losses, and metrics
-        model.compile(
-            optimizer=optimizer, loss=losses, loss_weights=loss_weights, metrics=metrics
-        )
+            # compile the model with the optimizer, losses, and metrics
+            model.compile(
+                optimizer=optimizer, loss=losses, loss_weights=loss_weights, metrics=metrics
+            )
 
         # load example data, generate random train/test split
         train_dataset, validation_dataset = config["loader"](**config["data"])
@@ -361,7 +366,7 @@ class Search(object):
             report[f"{task_name}_loss"] = "val_" + kerasify(
                 task_name, "loss", len(model.outputs) > 1
             )
-        callback = TuneReportCheckpointCallback(report)
+        callback = ReportCheckpointCallback(metrics=report)
 
         # train the model for the desired epochs using the call back
         model.fit(
@@ -467,9 +472,14 @@ class Search(object):
         # set flag indicating first experiment was run
         self._first = True
 
+        # tensorflow trainer
+        trainer = TensorflowTrainer(
+            train_loop_per_worker=trainable,
+            scaling_config=self.scaling_config)
+        
         # run experiment
         tuner = tune.Tuner(
-            trainable,
+            trainer,
             param_space=self._space,
             tune_config=tune_config,
             run_config=run_config,
