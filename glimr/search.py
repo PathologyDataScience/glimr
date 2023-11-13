@@ -9,6 +9,7 @@ from ray.tune.schedulers import AsyncHyperBandScheduler
 from ray.tune.stopper import TrialPlateauStopper
 from ray.tune.tune_config import TuneConfig
 from glimr.keras import keras_optimizer
+import tensorflow as tf
 
 
 class Search(object):
@@ -313,6 +314,16 @@ class Search(object):
             A configuration describing optimization and model hyperparameters
             as well as functions for data loading and model building.
         """
+
+        # avoid entire memory allocation with TensorFlow
+        # https://discuss.ray.io/t/tensorflow-allocates-all-available-memory-on-the-gpu-in-the-first-trial-leading-to-no-space-left-for-running-additional-trials-in-parallel/7585
+        gpus = tf.config.list_physical_devices("GPU")
+        if gpus:
+            try:
+                for gpu in gpus:
+                    tf.config.experimental.set_memory_growth(gpu, True)
+            except RuntimeError as e:
+                print(e)
 
         # create the model from the config
         model, losses, loss_weights, metrics = config["builder"](config)
