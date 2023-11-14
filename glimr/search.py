@@ -10,6 +10,9 @@ from ray.tune.stopper import TrialPlateauStopper
 from ray.tune.tune_config import TuneConfig
 from glimr.keras import keras_optimizer
 import tensorflow as tf
+import psutil
+import subprocess
+import gc
 
 
 class Search(object):
@@ -374,6 +377,16 @@ class Search(object):
             **config["fit_kwargs"],
         )
 
+        # free up memory
+        del model, train_dataset, validation_dataset, losses, loss_weights, metrics
+
+        # garbage collection
+        _ = gc.collect()
+
+        # empty SWAP memory
+        subprocess.run(["swapoff", "-a"])
+        subprocess.run(["swapon", "-a"])
+
     def experiment(
         self,
         local_dir,
@@ -441,6 +454,12 @@ class Search(object):
         tune_kwargs["mode"] = "max"
         tune_kwargs["num_samples"] = num_samples
         tune_kwargs["scheduler"] = scheduler
+
+        # Initiate a new actor for a new trial.
+        # NOTE: It has been observed that memory can keep increasing if it is set to 'True'.
+        # https://stackoverflow.com/questions/76511819/ray-2-5-stops-whole-experiment-upon-oom-exception
+        tune_kwargs["reuse_actors"] = False
+
         if search_alg is not None:
             tune_kwargs["search_alg"] = search_alg
         tune_config = TuneConfig(**tune_kwargs)
