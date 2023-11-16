@@ -1,7 +1,7 @@
 import datetime
 import os
 from ray import tune
-from ray.air import CheckpointConfig, ScalingConfig
+from ray.air import CheckpointConfig
 from ray.air.config import FailureConfig, RunConfig
 from ray.tune import CLIReporter, JupyterNotebookReporter, SyncConfig
 from ray.tune.integration.keras import TuneReportCheckpointCallback
@@ -74,7 +74,7 @@ class Search(object):
         Defines behavior for handling failed trials.
     reporter : ray.tune.CLIReporter or ray.tune.JupyterNotebookReporter
         An optional reporter for displaying experiment progress during tuning.
-    scaling_config : ray.air.ScalingConfig
+    resources : dict
         Defines available compute resources for workers.
     stopper : ray.tune.Stopper
         Defines the stopping criteria for terminating trials. May be overrided
@@ -89,8 +89,7 @@ class Search(object):
     set_reporter(metrics=None, parameters=None, jupyter=False, sort_by_metric=True,
         max_report_frequency=30, **kwargs)
         Set reporting behavior by generating a reporter object.
-    set_scaling(num_workers=1, use_gpu=False, resources_per_worker={"CPU": 1, "GPU": 0},
-        **kwargs)
+    set_resources(resources={"CPU": 1, "GPU": 0})
         Set experiment resources.
     trainable(config)
         Static function for running a trial.
@@ -141,8 +140,8 @@ class Search(object):
         # default FailureConfig
         self.failure_config = FailureConfig(max_failures=5)
 
-        # default ScalingConfig
-        self.set_scaling()
+        # default resources
+        self.set_resources()
 
         # default trial/experiment stopper
         if stopper is None:
@@ -271,9 +270,9 @@ class Search(object):
         else:
             self.reporter = CLIReporter(**reporter_kwargs)
 
-    def set_scaling(
+    def set_resources(
         self,
-        resources_per_worker={"CPU": 1, "GPU": 0},
+        resources={"CPU": 1, "GPU": 0},
     ):
         """Sets cpu and gpu resources used for training.
 
@@ -283,7 +282,7 @@ class Search(object):
 
         Parameters
         ----------
-        resources_per_worker : dict
+        resources : dict
             The cpu and gpu resources assigned to each worker. These values can
             be fractional. Default value is `{"CPU": 1, "GPU": 0}`.
 
@@ -301,7 +300,7 @@ class Search(object):
         trials in tune experiments.
         """
 
-        self.scaling_config = resources_per_worker
+        self.resources = resources
 
     @staticmethod
     def trainable(config):
@@ -319,14 +318,10 @@ class Search(object):
         """
 
         # avoid entire memory allocation with TensorFlow
-        # https://discuss.ray.io/t/tensorflow-allocates-all-available-memory-on-the-gpu-in-the-first-trial-leading-to-no-space-left-for-running-additional-trials-in-parallel/7585
-        gpus = tf.config.list_physical_devices("GPU")
-        if gpus:
-            try:
-                for gpu in gpus:
-                    tf.config.experimental.set_memory_growth(gpu, True)
-            except RuntimeError as e:
-                print(e)
+        _ = [
+            tf.config.experimental.set_memory_growth(gpu, True)
+            for gpu in tf.config.list_physical_devices("GPU")
+        ]
 
         # create the model from the config
         model, losses, loss_weights, metrics = config["builder"](config)
@@ -377,13 +372,13 @@ class Search(object):
             **config["fit_kwargs"],
         )
 
-        # free up memory
+        # free up memory (to improve memory consumption with fractional GPUs/CPUs)
         del model, train_dataset, validation_dataset, losses, loss_weights, metrics
 
-        # garbage collection
+        # garbage collection (to improve memory consumption with fractional GPUs/CPUs)
         _ = gc.collect()
 
-        # empty SWAP memory
+        # empty SWAP memory (to improve memory consumption with fractional GPUs/CPUs)
         subprocess.run(["swapoff", "-a"])
         subprocess.run(["swapon", "-a"])
 
@@ -455,9 +450,8 @@ class Search(object):
         tune_kwargs["num_samples"] = num_samples
         tune_kwargs["scheduler"] = scheduler
 
-        # Initiate a new actor for a new trial.
+        # Initiate a new actor for a new trial (to improve memory consumption with fractional GPUs/CPUs)
         # NOTE: It has been observed that memory can keep increasing if it is set to 'True'.
-        # https://stackoverflow.com/questions/76511819/ray-2-5-stops-whole-experiment-upon-oom-exception
         tune_kwargs["reuse_actors"] = False
 
         if search_alg is not None:
@@ -478,9 +472,9 @@ class Search(object):
             run_kwargs["stop"] = self.stopper
         run_config = RunConfig(**run_kwargs)
 
-        # add scaling config to search space if
-        if hasattr(self, "scaling_config"):
-            trainable = tune.with_resources(self.trainable, self.scaling_config)
+        # add resource config to search space
+        if hasattr(self, "resources"):
+            trainable = tune.with_resources(self.trainable, self.resources)
         else:
             trainable = self.trainable
 
