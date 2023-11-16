@@ -75,7 +75,7 @@ class Search(object):
     reporter : ray.tune.CLIReporter or ray.tune.JupyterNotebookReporter
         An optional reporter for displaying experiment progress during tuning.
     resources : dict
-        Defines available compute resources for workers.
+        Per-worker compute resources.
     stopper : ray.tune.Stopper
         Defines the stopping criteria for terminating trials. May be overrided
         by scheduler stopping criteria.
@@ -274,30 +274,29 @@ class Search(object):
         self,
         resources={"CPU": 1, "GPU": 0},
     ):
-        """Sets cpu and gpu resources used for training.
+        """Set available per-worker cpu and gpu resources.
 
-        This sets cpu/gpu resources to the experiment using `ray.tune.with_resources()`.
-        The number of concurrent trials that are run is set by `max_concurrent_trials` in
-        `Search.experiment()`.
+        This sets cpu/gpu resources available to each worker/trial that are passed to `ray.tune.with_resources()`.
+        Fractional resources can be used but may cause memory problems and result in failed trials. The number
+        of concurrent trials is limited by both available system resources and the `max_concurrent_trials` argument
+        (whichever is smaller). If using fractional resources, setting `max_concurrent_trials` to something less
+        than what system resources would permit can help limit out-of-memory errors.
 
         Parameters
         ----------
         resources : dict
-            The cpu and gpu resources assigned to each worker. These values can
-            be fractional. Default value is `{"CPU": 1, "GPU": 0}`.
+            A dictionary with "CPU" and "GPU" fields defining the resources available to each worker. Fractional
+            values result in sharing of resources by workers. Default value is `{"CPU": 1, "GPU": 0}`.
 
         Notes
         -----
         As per the information available at https://docs.ray.io/en/latest/tune/api/doc/ray.tune.with_resources.html,
         while `ray.tune.with_resources` is designed to accept a `ScalingConfig` object, it has been observed that
-        there is a known issue with the `ScalingConfig` functionality so that when a `ScalingConfig` object is passed
-        to `ray.tune.with_resources`, no GPU resources are utilized, even if some GPU cores are assigned to workers
-        using `ScalingConfig`.
+        passing a `ScalingConfig` object to `ray.tune.with_resources` doe not result in GPU utilization, regardless
+        of the configuration values.
 
-
-        See https://docs.ray.io/en/latest/tune/tutorials/tune-resources.html for
-        details on parallelism in ray tune and how resources are assigned to
-        trials in tune experiments.
+        See https://docs.ray.io/en/latest/tune/tutorials/tune-resources.html for details on parallelism in ray.tune 
+        and how resources are assigned to trials in tune experiments.
         """
 
         self.resources = resources
@@ -337,10 +336,7 @@ class Search(object):
         # load example data, generate random train/test split
         train_dataset, validation_dataset = config["loader"](**config["data"])
 
-        # epoch reporting of performance metrics - link keras metric names
-        # to names displayed by ray in reporting
-        # epoch reporting of performance metrics - link keras metric names
-        # to names displayed by ray in reporting
+        # epoch reporting of performance metrics - link keras metric names to names displayed in ray report
         def kerasify(task, metric, multitask=False):
             if multitask:
                 return f"{task}_{metric}"
