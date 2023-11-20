@@ -104,9 +104,10 @@ def get_top_k_trials(
 
     return final_df[column_order]
 
+
 def get_trial_info(exp_dir, metric=None):
     """
-    Given the directory path of a ray tune experiment as input, this function returns data on each trial 
+    Given the directory path of a ray tune experiment as input, this function returns data on each trial
     as specified by the given metric(es). If metric is `None`, a generic dataframe containing all
     trial information is returned.
 
@@ -133,24 +134,26 @@ def get_trial_info(exp_dir, metric=None):
             result_path = os.path.join(exp_dir, subdir, "result.json")
             if os.path.exists(result_path):
                 df = pd.read_json(result_path, lines=True)
-                df.insert(0, 'trial_#', counter)
+                df.insert(0, "trial_#", counter)
                 dataframes.append(df)
                 counter += 1
-    queried = pd.concat(dataframes, ignore_index=True) 
+    queried = pd.concat(dataframes, ignore_index=True)
     columns = queried.columns
     if metric is not None:
         bool_list = [True if i in columns else False for i in metric]
         if not all(bool_list):
             raise ValueError(f"{metric[bool_list.index(False)]} is not a valid metric")
-        queried = queried.loc[:,metric]
+        queried = queried.loc[:, metric]
     return queried
 
-def prune_constants(space):
-    """Prepares a search space for ray tune's PBT scheduler by pruning constants.
+
+def prune_constants_functions(space):
+    """Prepares a search space for ray tune's PBT scheduler by pruning constants and functions.
 
     This function recurses through a nested dictionary defining a search space, removing
-    any constant values from the space, where constant values are defined as non-container
-    types, non-callable objects, and non-ray.tune.search.sample.Domain or -Sampler objects.
+    any constant values and conditional functions (defined through tune.sample_from) from
+    the space, where constant values and functions are defined as non-container types,
+    non-callable objects, and non-ray.tune.search.sample.Domain or -Sampler objects.
     In this way, the returned search space is ready for use with ray tune's PBT scheduler.
 
     Parameters
@@ -174,13 +177,16 @@ def prune_constants(space):
             or isinstance(value, (sample.Domain, sample.Sampler))
         )
 
+    def _is_function(value):
+        return isinstance(value, ray.tune.search.sample.Function)
+
     pruned_space = {}
     for key, value in space.items():
         if isinstance(value, dict):
-            pruned_value = prune_constants(value)
+            pruned_value = prune_constants_functions(value)
             if pruned_value:  # don't add empty dicts
                 pruned_space[key] = pruned_value
-        elif not _is_constant(value):
+        elif not (_is_constant(value) or _is_function(value)):
             pruned_space[key] = value
     return pruned_space
 
