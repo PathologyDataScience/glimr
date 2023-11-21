@@ -6,8 +6,7 @@ import pandas as pd
 def get_top_k_trials(
     exp_dir, metric=None, mode="max", k=10, drop_dups=True, config_filter=None
 ):
-    """
-    Returns the top k-many trials of a ray tune experiment as measured by a given metric.
+    """Returns the top k trials of a ray tune experiment as measured by a given metric.
 
     Given the directory path of a ray tune experiment as input, this function returns the top k-many
     trials of the experiment based on a specified metric, while also allowing for custom filtering options.
@@ -148,25 +147,25 @@ def get_trial_info(exp_dir, metric=None):
 
 
 def prune_constants_functions(space):
-    """Prepares a search space for ray tune's PBT scheduler by pruning constants and functions.
+    """Prune constants and functions from a search space for pbt mutation.
 
     This function recurses through a nested dictionary defining a search space, removing
     any constant values and conditional functions (defined through tune.sample_from) from
-    the space, where constant values and functions are defined as non-container types,
-    non-callable objects, and non-ray.tune.search.sample.Domain or -Sampler objects.
-    In this way, the returned search space is ready for use with ray tune's PBT scheduler.
+    the space. Constant values and are defined as non-container types, non-callable objects, 
+    and non-ray.tune.search.sample.Domain or -Sampler objects. This allows the search 
+    space to be used as a the `hyperparam_mutations` argument for the 
+    ray.tune.schedulers.PopulationBasedTraining scheduler.
 
     Parameters
     ----------
     space : dict
-        A configuration dictionary defining a hyperparameter or model search space.
+        A configuration dictionary defining a search space.
 
     Returns
     -------
     pruned_space : dict
-        A pruned dictionary without any constants (defined as non-container types,
-        non-callable objects, and non-ray.tune.search.sample.Domain or -Sampler objects) ready
-        for use with ray tune's PBT scheduler.
+        A pruned space where constants and conditional search hyperparameters
+        have been removed.
     """
 
     def _is_constant(value):
