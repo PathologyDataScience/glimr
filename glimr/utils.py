@@ -1,6 +1,7 @@
 from ray.tune.search import sample
 import os
 import pandas as pd
+import ray
 
 
 def get_top_k_trials(
@@ -146,14 +147,14 @@ def get_trial_info(exp_dir, metric=None):
     return queried
 
 
-def prune_constants_functions(space):
+def prune_search(space):
     """Prune constants and functions from a search space for pbt mutation.
 
     This function recurses through a nested dictionary defining a search space, removing
     any constant values and conditional functions (defined through tune.sample_from) from
-    the space. Constant values and are defined as non-container types, non-callable objects, 
-    and non-ray.tune.search.sample.Domain or -Sampler objects. This allows the search 
-    space to be used as a the `hyperparam_mutations` argument for the 
+    the space. Constant values and are defined as non-container types, non-callable objects,
+    and non-ray.tune.search.sample.Domain or -Sampler objects. This allows the search
+    space to be used as a the `hyperparam_mutations` argument for the
     ray.tune.schedulers.PopulationBasedTraining scheduler.
 
     Parameters
@@ -182,7 +183,7 @@ def prune_constants_functions(space):
     pruned_space = {}
     for key, value in space.items():
         if isinstance(value, dict):
-            pruned_value = prune_constants_functions(value)
+            pruned_value = prune_search(value)
             if pruned_value:  # don't add empty dicts
                 pruned_space[key] = pruned_value
         elif not (_is_constant(value) or _is_function(value)):
