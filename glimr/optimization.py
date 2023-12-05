@@ -1,4 +1,5 @@
 from ray import tune
+import numpy as np
 
 
 def optimization_space(
@@ -78,4 +79,17 @@ def optimization_space(
         "ema_overwrite_frequency": ema_overwrite_frequency,
     }
 
+    return space
+
+
+def data_space(batch_size=1, cv_folds=None, **kwargs):
+    space = {}
+    space["batch_size"] = batch_size
+
+    for arg, val in zip(kwargs, kwargs.values()):
+        space[arg] = val
+
+    if cv_folds is not None:
+        space["cv_fold_index"] = tune.grid_search(np.arange(cv_folds))
+        space["cv_folds"] = cv_folds
     return space
