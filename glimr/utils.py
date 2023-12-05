@@ -1,7 +1,9 @@
 from ray.tune.search import sample
 import os
 import pandas as pd
+import numpy as np
 import ray
+from inspect import isfunction
 
 
 def get_top_k_trials(
@@ -219,3 +221,120 @@ def sample_space(space):
         return sample_space(space.sample())
     else:  # non sampleable or nestable value
         return space
+
+
+def top_cv_trials(exp_dir, metric=None, mode="max", model_selection="fold_bests"):
+    dataframes = []
+    subdirs = os.listdir(exp_dir)
+    for subdir in subdirs:
+        if subdir.startswith("trainable") and os.path.isdir(
+            os.path.join(exp_dir, subdir)
+        ):
+            json_path = os.path.join(exp_dir, subdir, "result.json")
+            if os.path.exists(json_path):
+                df = pd.read_json(json_path, dtype=False, lines=True)
+                dataframes.append(df)
+
+    final_df = pd.concat(dataframes, ignore_index=True)
+
+    # drop duplicates
+    final_df.drop_duplicates(
+        subset="trial_id", keep="first", inplace=True, ignore_index=True
+    )
+
+    # fill None values with ''
+    final_df.fillna("", inplace=True)
+
+    # get fold indexes
+    final_df["folds"] = [fold["data"]["cv_fold_index"] for fold in final_df["config"]]
+
+    # check if metric(s) exists in trials
+    if metric is not None:
+        if isinstance(metric, dict):
+            for key in metric:
+                if key not in final_df.columns:
+                    raise ValueError(
+                        f"Argument metric must be None or one or any combinations of {final_df.columns.tolist()}."
+                    )
+
+    if metric is None:
+        metric = final_df.columns[0]
+
+    # sort results based on first column
+    if isinstance(metric, str):
+        final_df.sort_values(
+            by=metric, ascending=(mode == "min"), inplace=True, ignore_index=True
+        )
+
+    # define "combined metric" column if metric is a dict: Exp: metric={'softmax_auc': 0.7, 'softmax_balanced': 0.3}
+    if isinstance(metric, dict):
+        keys = list(metric.keys())
+        final_df["combined_metric"] = np.sum(
+            final_df.filter(keys).values
+            * np.expand_dims(np.array(list(metric.values())), 0),
+            -1,
+        )
+        model_selection_metric = "combined_metric"
+    else:
+        model_selection_metric = metric
+
+    # build in functions
+    def _get_chckpt_path(trial_id, training_iteration):
+        subdir = [s for s in subdirs if s.startswith(f"trainable_{trial_id}")][0]
+        chckpt_num = f"checkpoint_{str(training_iteration - 1).zfill(6)}"
+        chckpt_path = os.path.join(exp_dir, subdir, chckpt_num, "")
+        if not os.path.exists(chckpt_path):
+            return None
+        return chckpt_path
+
+    def fold_bests(df, metric, mode):
+        temp_df = df[df["checkpoint_path"] != ""]
+        if mode == "max":
+            idx = temp_df.groupby(["folds"])[metric].idxmax()
+        else:
+            idx = temp_df.groupby(["folds"])[metric].idxmin()
+        out_df = temp_df.loc[idx]
+        out_df = out_df.reset_index(drop=True)
+        return out_df
+
+    def best(df, metric, mode):
+        temp_df = df[df["checkpoint_path"] != ""]
+        if mode == "max":
+            idx = temp_df[metric].idxmax()
+        else:
+            idx = temp_df[metric].idxmin()
+        out_df = temp_df.loc[idx]
+        out_df = out_df.reset_index(drop=True)
+        return out_df
+
+    # get checkpoint dirs
+    final_df["checkpoint_path"] = [
+        _get_chckpt_path(id, it)
+        for id, it in zip(final_df["trial_id"], final_df["training_iteration"])
+    ]
+
+    # drop unnecessary columns
+    if isinstance(metric, dict):
+        metric_names = list(metric.keys()) + ["combined_metric"]
+    else:
+        metric_names = [metric]
+    metadata = [
+        "folds",
+        "trial_id",
+        "training_iteration",
+        "checkpoint_path",
+        "config",
+    ] + metric_names
+    final_df = final_df[metadata]
+
+    # model selection
+    if model_selection is not None:
+        if isinstance(model_selection, str):
+            selected_configs = eval(model_selection)(
+                final_df, model_selection_metric, mode
+            )
+        elif isfunction(model_selection):
+            selected_configs = model_selection(final_df, model_selection_metric, mode)
+        return selected_configs
+    else:
+        return final_df
