@@ -8,9 +8,11 @@ from ray.tune.integration.keras import TuneReportCheckpointCallback
 from ray.tune.schedulers import AsyncHyperBandScheduler
 from ray.tune.stopper import TrialPlateauStopper
 from ray.tune.tune_config import TuneConfig
+from ray.tune.search.basic_variant import BasicVariantGenerator
 from glimr.keras import keras_optimizer
 import tensorflow as tf
 import psutil
+import inspect
 import subprocess
 import gc
 
@@ -106,6 +108,7 @@ class Search(object):
         stopper=None,
         metric=None,
         mode="max",
+        cv=False,
         loader_kwargs=None,
         fit_kwargs=None,
     ):
@@ -120,6 +123,43 @@ class Search(object):
         space["fit_kwargs"] = fit_kwargs
         space["loader"] = loader
         self._space = space
+        self.cv = cv
+
+        # if cv is 'True', check if search space contains cv parameters
+        if cv:
+            data_keys = list(space["data"].keys())
+            if "cv_fold_index" in data_keys and "cv_fold_index" in data_keys:
+                pass
+            else:
+                raise ValueError(
+                    "For cross validation, data dictionary should contain two `cv_fold_index`, `cv_folds` keys"
+                )
+
+        # check if data loader has two input aurguments `cv_fold_index`, `cv_folds`
+        if cv:
+            args = inspect.getfullargspec(loader)[0]
+            if "cv_fold_index" in args and "cv_folds" in args:
+                pass
+            else:
+                raise ValueError(
+                    """For cross validation, data loader must have two aurguments `cv_fold_index`, `cv_folds`.:
+                
+                Example:
+
+                def data_loader(..., cv_fold_index=0, cv_folds=0):
+                    ...
+
+                    skf = StratifiedKFold(n_splits=cv_folds, shuffle=True, random_state=0)
+                    idx = [idx for idx in skf.split(X, Y)][cv_fold_index]
+                    train = X[idx[0]]
+                    validation = X[idx[1]]
+                    
+                    ...
+
+                    return train_ds, validation_ds
+                
+                """
+                )
 
         # extract default optimization metric - first task & first metric
         if metric is None:
@@ -295,7 +335,7 @@ class Search(object):
         passing a `ScalingConfig` object to `ray.tune.with_resources` doe not result in GPU utilization, regardless
         of the configuration values.
 
-        See https://docs.ray.io/en/latest/tune/tutorials/tune-resources.html for details on parallelism in ray.tune 
+        See https://docs.ray.io/en/latest/tune/tutorials/tune-resources.html for details on parallelism in ray.tune
         and how resources are assigned to trials in tune experiments.
         """
 
@@ -451,7 +491,17 @@ class Search(object):
         tune_kwargs["reuse_actors"] = False
 
         if search_alg is not None:
-            tune_kwargs["search_alg"] = search_alg
+            if (
+                self.cv
+            ):  # Using `BasicVariantGenerator` seach algorithm for cross validation
+                tune_kwargs["search_alg"] = BasicVariantGenerator(
+                    constant_grid_search=True
+                )  # `constant_grid_search` must be True for CV.
+                print(
+                    "The appropriate search algorithm for cross validation is `BasicVariantGenerator`: replacing search algorithm with `BasicVariantGenerator`"
+                )
+            else:
+                tune_kwargs["search_alg"] = search_alg
         tune_config = TuneConfig(**tune_kwargs)
 
         # create run config
