@@ -247,6 +247,15 @@ def top_cv_trials(exp_dir, metric=None, mode="max", model_selection="fold_bests"
         out_df = out_df.reset_index(drop=True)
         return out_df
 
+    def global_top(df, metric, mode, k=1):
+        if mode == "max":
+            idx = df[metric].nlargest(k).index.values
+        else:
+            idx = df[metric].nsmallest(k).index.values
+        out_df = df.loc[idx]
+        out_df = out_df.reset_index(drop=True)
+        return out_df
+
     # get checkpoint dirs
     final_df["checkpoint_path"] = _checkpoints(final_df)
 
@@ -267,9 +276,15 @@ def top_cv_trials(exp_dir, metric=None, mode="max", model_selection="fold_bests"
     # model selection
     if model_selection is not None:
         if isinstance(model_selection, str):
-            selected_configs = eval(model_selection)(
-                final_df, model_selection_metric, mode
-            )
+            if "top" in model_selection:
+                s1, s2, k = model_selection.split("_")
+                selected_configs = eval("_".join([s1, s2]))(
+                    final_df, model_selection_metric, mode, int(k)
+                )
+            else:
+                selected_configs = eval(model_selection)(
+                    final_df, model_selection_metric, mode
+                )
         elif isfunction(model_selection):
             selected_configs = model_selection(final_df, model_selection_metric, mode)
         return selected_configs
