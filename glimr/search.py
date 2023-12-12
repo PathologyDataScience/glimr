@@ -1,5 +1,9 @@
 import datetime
+import gc
+from glimr.keras import keras_optimizer
+import inspect
 import os
+import psutil
 from ray import tune
 from ray.air import CheckpointConfig
 from ray.air.config import FailureConfig, RunConfig
@@ -9,12 +13,9 @@ from ray.tune.schedulers import AsyncHyperBandScheduler
 from ray.tune.stopper import TrialPlateauStopper
 from ray.tune.tune_config import TuneConfig
 from ray.tune.search.basic_variant import BasicVariantGenerator
-from glimr.keras import keras_optimizer
 import tensorflow as tf
-import psutil
-import inspect
 import subprocess
-import gc
+import warnings
 
 
 class Search(object):
@@ -472,20 +473,19 @@ class Search(object):
         tune_kwargs["num_samples"] = num_samples
         tune_kwargs["scheduler"] = scheduler
 
-        # Initiate a new actor for a new trial (to improve memory consumption with fractional GPUs/CPUs)
-        # NOTE: It has been observed that memory can keep increasing if it is set to 'True'.
+        # Initiate a new actor for each trial to avoid leaks and memory growth
         tune_kwargs["reuse_actors"] = False
 
         if search_alg is not None:
-            if (
-                self.cv
-            ):  # Using `BasicVariantGenerator` seach algorithm for cross validation
+            if self.cv_folds is not None:
+                # `BasicVariantGenerator` seach algorithm required for cross validation
                 tune_kwargs["search_alg"] = BasicVariantGenerator(
                     constant_grid_search=True
                 )  # `constant_grid_search` must be True for CV.
-                print(
-                    "The appropriate search algorithm for cross validation is `BasicVariantGenerator`: replacing search algorithm with `BasicVariantGenerator`"
-                )
+                warnings.warn((
+                    "Replacing search algorithm with `BasicVariantGenerator` required for "
+                    "cross validation."
+                ))
             else:
                 tune_kwargs["search_alg"] = search_alg
         tune_config = TuneConfig(**tune_kwargs)
