@@ -31,14 +31,15 @@ def _parse_experiment(exp_dir):
             if os.path.exists(result_path):
                 df = pd.read_json(result_path, lines=True)
                 df.insert(0, "trial_#", i)
+                df.insert(1, "subdir", subdir)
+                df.insert(2, "exp_dir", exp_dir)
                 dataframes.append(df)
 
     return pd.concat(dataframes, ignore_index=True)
 
 
-def _get_chckpt_path(trial_id, training_iteration):
+def _get_chckpt_path(training_iteration, subdir, exp_dir):
     """Recover checkpoint path given a trial_id and epoch"""
-    subdir = [s for s in subdirs if s.startswith(f"trainable_{trial_id}")][0]
     chckpt_num = f"checkpoint_{str(training_iteration - 1).zfill(6)}"
     chckpt_path = os.path.join(exp_dir, subdir, chckpt_num, "")
     if not os.path.exists(chckpt_path):
@@ -49,8 +50,8 @@ def _get_chckpt_path(trial_id, training_iteration):
 def _checkpoints(df):
     """Build list of checkpoints."""
     return [
-        _get_chckpt_path(id, it)
-        for id, it in zip(df["trial_id"], df["training_iteration"])
+        _get_chckpt_path(it, sb, dr)
+        for it, sb, dr in zip(df["training_iteration"], df["subdir"], df["exp_dir"])
     ]
 
 
@@ -59,7 +60,7 @@ def get_top_k_trials(
 ):
     """Returns the top k trials of a ray tune experiment as measured by a given metric.
 
-    Given an experiment output path, this function returns the top k trials based on a 
+    Given an experiment output path, this function returns the top k trials based on a
     specified metric or custom filtering options.
 
     Parameters
@@ -67,22 +68,22 @@ def get_top_k_trials(
     exp_dir : str
         The directory path of the ongoing or saved ray tune experiment.
     metric : str
-        The metric name used for sorting the trials. If `None`, the first metric 
+        The metric name used for sorting the trials. If `None`, the first metric
         reported by ray tune will be used. Default value is `None`.
     mode : str
-        Sorting order to determine top trials. Must be one of "max" or "min". By default, 
+        Sorting order to determine top trials. Must be one of "max" or "min". By default,
         `mode="max"` sorts trials in descending order.
     k : int
         The number of trials to retrieve. If `None` all trials will be returned. Default
         value is 10.
     drop_dups : bool
-        If `True` duplicate trials will be eliminated from the output, retaining only 
-        the first / best trial as determined by `metric` and `mode`. If `False`, 
-        multiple epochs/checkpoints from a single trial may be included in the output. 
+        If `True` duplicate trials will be eliminated from the output, retaining only
+        the first / best trial as determined by `metric` and `mode`. If `False`,
+        multiple epochs/checkpoints from a single trial may be included in the output.
         Default value is `True`.
     config_filter : function
-        An optional function for filtering the rows of the dataframe based on values 
-        in the config dictionary of a trial. This function should accept the trial 
+        An optional function for filtering the rows of the dataframe based on values
+        in the config dictionary of a trial. This function should accept the trial
         configuration dicationary as its only input, and should return a boolean
         indicating whether the trial should be included (True) or not (False). Default
         value is `None`.
