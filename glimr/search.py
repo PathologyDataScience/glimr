@@ -132,7 +132,6 @@ class Search(object):
 
         # check if data loader function has `cv_fold_index`, `cv_folds` arguments
         if cv_folds is not None:
-
             # add data loader arguments to config
             config["cv_fold_index"] = tune.grid_search(list(range(cv_folds)))
 
@@ -141,10 +140,12 @@ class Search(object):
             if "cv_fold_index" in args and "cv_folds" in args:
                 pass
             else:
-                raise ValueError((
-                    "Cross validation requires data loader `cv_fold_index`, `cv_folds` function "
-                    "arguments."
-                ))
+                raise ValueError(
+                    (
+                        "Cross validation requires data loader `cv_fold_index`, `cv_folds` function "
+                        "arguments."
+                    )
+                )
 
         # extract default optimization metric - first task & first metric
         if metric is None:
@@ -173,11 +174,13 @@ class Search(object):
             self.stopper = TrialPlateauStopper(metric=self.metric)
         else:
             if not isinstance(stopper, tune.Stopper):
-                raise ValueError((
-                    "stopper must be a ray.tune.Stopper object. For example: "
-                    "TrialPlateauStopper, MaximumIterationStopper, ExperimentPlateauStopper, "
-                    "TimeOutStopper, etc."
-                ))
+                raise ValueError(
+                    (
+                        "stopper must be a ray.tune.Stopper object. For example: "
+                        "TrialPlateauStopper, MaximumIterationStopper, ExperimentPlateauStopper, "
+                        "TimeOutStopper, etc."
+                    )
+                )
             self.stopper = stopper
 
         # default SyncConfig
@@ -482,10 +485,12 @@ class Search(object):
                 tune_kwargs["search_alg"] = BasicVariantGenerator(
                     constant_grid_search=True
                 )  # `constant_grid_search` must be True for CV.
-                warnings.warn((
-                    "Replacing search algorithm with `BasicVariantGenerator` required for "
-                    "cross validation."
-                ))
+                warnings.warn(
+                    (
+                        "Replacing search algorithm with `BasicVariantGenerator` required for "
+                        "cross validation."
+                    )
+                )
             else:
                 tune_kwargs["search_alg"] = search_alg
         tune_config = TuneConfig(**tune_kwargs)
