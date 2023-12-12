@@ -222,7 +222,7 @@ def top_cv_trials(exp_dir, metric=None, mode="max", model_selection="fold_bests"
         out_df = out_df.reset_index(drop=True)
         return out_df
 
-    def best(df, metric, mode):
+    def global_best(df, metric, mode):
         temp_df = df[df["checkpoint_path"] != ""]
         if mode == "max":
             idx = temp_df[metric].idxmax()
