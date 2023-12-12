@@ -232,6 +232,21 @@ def top_cv_trials(exp_dir, metric=None, mode="max", model_selection="fold_bests"
         out_df = out_df.reset_index(drop=True)
         return out_df
 
+    def fold_top(df, metric, mode, k=1):
+        if mode == "max":
+            idx = [
+                index[1]
+                for index in df.groupby("folds")[metric].nlargest(k).index.values
+            ]
+        else:
+            idx = [
+                index[1]
+                for index in df.groupby("folds")[metric].nsmallest(k).index.values
+            ]
+        out_df = df.loc[idx]
+        out_df = out_df.reset_index(drop=True)
+        return out_df
+
     # get checkpoint dirs
     final_df["checkpoint_path"] = _checkpoints(final_df)
 
