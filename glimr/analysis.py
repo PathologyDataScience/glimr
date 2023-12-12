@@ -59,34 +59,33 @@ def get_top_k_trials(
 ):
     """Returns the top k trials of a ray tune experiment as measured by a given metric.
 
-    Given the directory path of a ray tune experiment as input, this function returns the top k-many
-    trials of the experiment based on a specified metric, while also allowing for custom filtering options.
+    Given an experiment output path, this function returns the top k trials based on a 
+    specified metric or custom filtering options.
 
     Parameters
     ----------
     exp_dir : str
-        The directory path of the ongoing or saved ray tune experiment. This path should contain
-        subdirectories with the prefix "trainable" for each trial conducted in the experiment.
+        The directory path of the ongoing or saved ray tune experiment.
     metric : str
-        Used to specify the column in the dataframe that will be used for sorting the trials.
-        If `metric=None`, the metric will be taken as the first of the available metrics reported by
-        ray tune. By default, `metric=None`.
+        The metric name used for sorting the trials. If `None`, the first metric 
+        reported by ray tune will be used. Default value is `None`.
     mode : str
-        Specifies whether to report the k-most maximum or k-most minimum trials as measured by
-        the provided `metric`. Must be one of "max" or "min". By default, `mode="max"`.
+        Sorting order to determine top trials. Must be one of "max" or "min". By default, 
+        `mode="max"` sorts trials in descending order.
     k : int
-        The number of trials to retrieve. If `k=None` all trials will be returned. By default, `k=10`.
+        The number of trials to retrieve. If `None` all trials will be returned. Default
+        value is 10.
     drop_dups : bool
-        A boolean flag determining whether duplicate trials should be dropped from the final dataframe.
-        If set to True, only the first occurrence of each trial_id will be kept in the dataframe, and
-        therefore each trial will be represented by its best performing epoch as determined by `metric`.
-        If set to False, then many epochs of a single trial could (in theory) be included in the final
-        dataframe, depending on their performance. By default, `drop_dups=True`.
+        If `True` duplicate trials will be eliminated from the output, retaining only 
+        the first / best trial as determined by `metric` and `mode`. If `False`, 
+        multiple epochs/checkpoints from a single trial may be included in the output. 
+        Default value is `True`.
     config_filter : function
-        An optional function that can be used to filter the rows of the dataframe based on the values in
-        the config dictionary of a ray tune experiment trial. The given function must take a single
-        argument, the dictionary representing the configuration of a trial, and must return a boolean
-        value indicating whether the trial should be included or not. By default, `config_filter=None`.
+        An optional function for filtering the rows of the dataframe based on values 
+        in the config dictionary of a trial. This function should accept the trial 
+        configuration dicationary as its only input, and should return a boolean
+        indicating whether the trial should be included (True) or not (False). Default
+        value is `None`.
 
     Returns
     -------
@@ -109,7 +108,7 @@ def get_top_k_trials(
         )
 
     if metric is None:
-        metric = final_df.columns[0]
+        metric = final_df.columns[1]
 
     final_df.sort_values(
         by=metric, ascending=(mode == "min"), inplace=True, ignore_index=True
