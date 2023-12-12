@@ -57,6 +57,10 @@ class Search(object):
         Either "max" or "min" indicating whether to maximize or minimize
         the metric. Default value is "max". If using loss for tuning
         "min" should be selected.
+    cv_folds : int
+        The number of cross validation folds to perform. Each fold will
+        run as a separate trial with the same configuration. Requires the
+        dataloader function to have `cv_fold_index` and `cv_folds` arguments.
     fit_kwargs : dict
         Keyword arguments for tf.keras.model.fit. Allows customization of
         keras model training options. Default value is None.
@@ -108,7 +112,7 @@ class Search(object):
         stopper=None,
         metric=None,
         mode="max",
-        cv=False,
+        cv_folds=None,
         loader_kwargs=None,
         fit_kwargs=None,
     ):
@@ -123,43 +127,23 @@ class Search(object):
         space["fit_kwargs"] = fit_kwargs
         space["loader"] = loader
         self._space = space
-        self.cv = cv
+        self.cv_folds = cv_folds
 
-        # if cv is 'True', check if search space contains cv parameters
-        if cv:
-            data_keys = list(space["data"].keys())
-            if "cv_fold_index" in data_keys and "cv_fold_index" in data_keys:
-                pass
-            else:
-                raise ValueError(
-                    "For cross validation, data dictionary should contain two `cv_fold_index`, `cv_folds` keys"
-                )
+        # check if data loader function has `cv_fold_index`, `cv_folds` arguments
+        if cv_folds is not None:
 
-        # check if data loader has two input aurguments `cv_fold_index`, `cv_folds`
-        if cv:
+            # add data loader arguments to config
+            config["cv_fold_index"] = tune.grid_search(list(range(cv_folds)))
+
+            # check that dataloader has required arguments for cross validation
             args = inspect.getfullargspec(loader)[0]
             if "cv_fold_index" in args and "cv_folds" in args:
                 pass
             else:
-                raise ValueError(
-                    """For cross validation, data loader must have two aurguments `cv_fold_index`, `cv_folds`.:
-                
-                Example:
-
-                def data_loader(..., cv_fold_index=0, cv_folds=0):
-                    ...
-
-                    skf = StratifiedKFold(n_splits=cv_folds, shuffle=True, random_state=0)
-                    idx = [idx for idx in skf.split(X, Y)][cv_fold_index]
-                    train = X[idx[0]]
-                    validation = X[idx[1]]
-                    
-                    ...
-
-                    return train_ds, validation_ds
-                
-                """
-                )
+                raise ValueError((
+                    "Cross validation requires data loader `cv_fold_index`, `cv_folds` function "
+                    "arguments."
+                ))
 
         # extract default optimization metric - first task & first metric
         if metric is None:
@@ -188,9 +172,11 @@ class Search(object):
             self.stopper = TrialPlateauStopper(metric=self.metric)
         else:
             if not isinstance(stopper, tune.Stopper):
-                raise ValueError(
-                    "stopper must be a ray.tune.Stopper object. For example: TrialPlateauStopper, MaximumIterationStopper, ExperimentPlateauStopper, TimeOutStopper, etc."
-                )
+                raise ValueError((
+                    "stopper must be a ray.tune.Stopper object. For example: "
+                    "TrialPlateauStopper, MaximumIterationStopper, ExperimentPlateauStopper, "
+                    "TimeOutStopper, etc."
+                ))
             self.stopper = stopper
 
         # default SyncConfig
