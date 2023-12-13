@@ -282,47 +282,29 @@ def top_cv_trials(
         model_selection_metric = metric
 
     # build in functions
-    def fold_bests(df, metric, mode):
-        temp_df = df[df["checkpoint_path"] != ""]
-        if mode == "max":
-            idx = temp_df.groupby(["folds"])[metric].idxmax()
-        else:
-            idx = temp_df.groupby(["folds"])[metric].idxmin()
-        out_df = temp_df.loc[idx]
-        out_df = out_df.reset_index(drop=True)
-        return out_df
-
-    def global_best(df, metric, mode):
-        temp_df = df[df["checkpoint_path"] != ""]
-        if mode == "max":
-            idx = temp_df[metric].idxmax()
-        else:
-            idx = temp_df[metric].idxmin()
-        out_df = temp_df.loc[idx]
-        out_df = out_df.reset_index(drop=True)
-        return out_df
-
     def fold_top(df, metric, mode, k=1):
+        temp_df = df[df["checkpoint_path"] != ""]
         if mode == "max":
             idx = [
                 index[1]
-                for index in df.groupby("folds")[metric].nlargest(k).index.values
+                for index in temp_df.groupby("folds")[metric].nlargest(k).index.values
             ]
         else:
             idx = [
                 index[1]
-                for index in df.groupby("folds")[metric].nsmallest(k).index.values
+                for index in temp_df.groupby("folds")[metric].nsmallest(k).index.values
             ]
-        out_df = df.loc[idx]
+        out_df = temp_df.loc[idx]
         out_df = out_df.reset_index(drop=True)
         return out_df
 
     def global_top(df, metric, mode, k=1):
+        temp_df = df[df["checkpoint_path"] != ""]
         if mode == "max":
-            idx = df[metric].nlargest(k).index.values
+            idx = temp_df[metric].nlargest(k).index.values
         else:
-            idx = df[metric].nsmallest(k).index.values
-        out_df = df.loc[idx]
+            idx = temp_df[metric].nsmallest(k).index.values
+        out_df = temp_df.loc[idx]
         out_df = out_df.reset_index(drop=True)
         return out_df
 
