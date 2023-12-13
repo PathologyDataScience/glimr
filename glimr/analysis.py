@@ -115,6 +115,20 @@ def _deserialize_config(serialized_config, result=None):
     return result
 
 
+def _filter_checkpoints(group):
+    non_null_check_rows = group.dropna(subset=["checkpoint_path"])
+    if len(non_null_check_rows) == 1:
+        return non_null_check_rows.iloc[0]
+    elif len(non_null_check_rows) == 2:
+        return non_null_check_rows.loc[
+            non_null_check_rows["training_iteration"].idxmin()
+        ]
+    else:
+        raise ValueError(
+            f"There are more than two checkpoints for trial {non_null_check_rows.iloc[0]['trial']}"
+        )
+
+
 def _checkpoints(df):
     """Build list of checkpoints."""
     return [
@@ -277,11 +291,6 @@ def top_cv_trials(
 
     final_df = _parse_experiment(exp_dir)
 
-    # drop duplicates
-    final_df.drop_duplicates(
-        subset="trial_id", keep="first", inplace=True, ignore_index=True
-    )
-
     # fill None values with ''
     final_df.fillna("", inplace=True)
 
@@ -350,6 +359,11 @@ def top_cv_trials(
 
     # get checkpoint dirs
     final_df["checkpoint_path"] = _checkpoints(final_df)
+
+    # Verify checkpoints
+    final_df = (
+        final_df.groupby("trial_id").apply(_filter_checkpoints).reset_index(drop=True)
+    )
 
     # drop unnecessary columns
     if isinstance(metric, dict):
