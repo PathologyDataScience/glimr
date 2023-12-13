@@ -4,6 +4,8 @@ import pandas as pd
 import numpy as np
 import ray
 from inspect import isfunction
+from collections import OrderedDict, defaultdict
+import json
 
 
 def _parse_experiment(exp_dir):
@@ -45,6 +47,72 @@ def _get_chckpt_path(training_iteration, subdir, exp_dir):
     if not os.path.exists(chckpt_path):
         return None
     return chckpt_path
+
+
+def _mean_config(serialized_config):
+    """Calculate the average of best configs"""
+
+    def _checkNumber(l):
+        return all(isinstance(i, (int, float)) for i in l)
+
+    merged_config = {
+        key: [cfg[key] for cfg in serialized_config]
+        for key in serialized_config[0].keys()
+    }
+    avg_config = {
+        key: int(np.mean(merged_config[key]))
+        if isinstance(merged_config[key][0], int)
+        else np.mean(merged_config[key])
+        if _checkNumber(merged_config[key])
+        else merged_config[key][0]
+        for key in merged_config
+    }
+
+    return avg_config
+
+
+def _serialize_config(config, result=None, prefix=""):
+    """Serialize a nested config dictionary"""
+    if result is None:
+        result = dict()
+    for k, v in config.items():
+        new_k = "__".join((prefix, k)) if prefix else k
+        if not (isinstance(v, dict) or isinstance(v, OrderedDict)):
+            result.update({new_k: v})
+        else:
+            _serialize_config(v, result, new_k)
+    return result
+
+
+def _deserialize_config(serialized_config, result=None):
+    def tree():
+        return defaultdict(tree)
+
+    def rec(keys_iter, value):
+        _r = tree()
+        try:
+            _k = next(keys_iter)
+            _r[_k] = rec(keys_iter, value)
+            return _r
+        except StopIteration:
+            return value
+
+    if result is None:
+        result = dict()
+
+    for k, v in serialized_config.items():
+        keys_nested_iter = iter(k.split("__"))
+        cur_level_dict = result
+        while True:
+            try:
+                k = next(keys_nested_iter)
+                if k in cur_level_dict:
+                    cur_level_dict = cur_level_dict[k]
+                else:
+                    cur_level_dict[k] = json.loads(json.dumps(rec(keys_nested_iter, v)))
+            except StopIteration:
+                break
+    return result
 
 
 def _checkpoints(df):
@@ -164,7 +232,9 @@ def get_trial_info(exp_dir, metric=None):
     return queried
 
 
-def top_cv_trials(exp_dir, metric=None, mode="max", model_selection="fold_bests"):
+def top_cv_trials(
+    exp_dir, metric=None, mode="max", model_selection="fold_bests", average_config=False
+):
     final_df = _parse_experiment(exp_dir)
 
     # drop duplicates
@@ -287,6 +357,11 @@ def top_cv_trials(exp_dir, metric=None, mode="max", model_selection="fold_bests"
                 )
         elif isfunction(model_selection):
             selected_configs = model_selection(final_df, model_selection_metric, mode)
+        if average_config:
+            cfgs = selected_configs["config"].values
+            serialized_config = [_serialize_config(cfg) for cfg in cfgs]
+            avg_config = _mean_config(serialized_config)
+            selected_configs = _deserialize_config(avg_config)
         return selected_configs
     else:
         return final_df
