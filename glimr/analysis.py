@@ -233,8 +233,48 @@ def get_trial_info(exp_dir, metric=None):
 
 
 def top_cv_trials(
-    exp_dir, metric=None, mode="max", model_selection="fold_bests", average_config=False
+    exp_dir, metric=None, mode="max", model_selection="fold_top_1", average_config=False
 ):
+    """Returns the top k cross validation trials of a ray tune experiment.
+
+    Given an experiment output path, this function returns the top k cross validation trials
+    based on a specified metric and model selection criterion.
+
+    Parameters
+    ----------
+    exp_dir : str
+        The directory path of the ongoing or saved ray tune experiment.
+    metric : [str, dict]
+        The metric name used for sorting the trials. If `None`, the first metric
+        reported by ray tune will be used. It can be also possible to use a combination
+        of different metrics reported by ray to sort trials by defining the metric
+        as a dictionary as below. Default value is `None`.
+        metric = {"auc": 0.7, "f1-score": 0.3}
+    mode : str
+        Sorting order to determine top trials. Must be one of "max" or "min". By default,
+        `mode="max"` sorts trials in descending order.
+    model_selection : [str, function]
+        The criterion used for selecting best models within folds or globally. The possible
+        options for model selection criterion is as follows:
+            1. "fold_top": it selects the best model among trials of each fold
+            2. "global_top": it selects the best model among all trials
+            3. "fold_top_<int>: it would select top k trials within each folds. For example,
+                "fold_top_2" will select the two most top performing models within each fold.
+            4. function: An optional criterion defined as a function outside "top_cv_trials"
+            can be also used for model selection.
+        Default value is "fold_top_1".
+    average_config : bool
+        If `True`, the average of top-performing configurations will be calculated.
+        Default value is `False`.
+
+
+    Returns
+    -------
+    final_df : pandas.DataFrame
+        a pandas DataFrame containing performance metrics and metadata detailing the top k trials
+        (as measued by the specified `metric`) of a ray tune experiment.
+    """
+
     final_df = _parse_experiment(exp_dir)
 
     # drop duplicates
