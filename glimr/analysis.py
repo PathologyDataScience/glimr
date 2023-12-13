@@ -9,7 +9,7 @@ import json
 
 
 def _parse_experiment(exp_dir):
-    """Parses an experiment directory, returning results as a pandas.Dataframe
+    """Parses an experiment directory returning results as a pandas.Dataframe
 
     Parameters
     ----------
@@ -19,7 +19,8 @@ def _parse_experiment(exp_dir):
     Returns
     -------
     df : pandas.DataFrame
-        A dataframe where each row represents a trial, and each column a metric.
+        A pandas DataFrame containing performance metrics for each epoch and trial of
+        the experiment.
     """
 
     dataframes = []
@@ -36,12 +37,12 @@ def _parse_experiment(exp_dir):
                 df.insert(1, "subdir", subdir)
                 df.insert(2, "exp_dir", exp_dir)
                 dataframes.append(df)
-
     return pd.concat(dataframes, ignore_index=True)
 
 
 def _get_chckpt_path(training_iteration, subdir, exp_dir):
     """Recover checkpoint path given a trial_id and epoch"""
+
     chckpt_num = f"checkpoint_{str(training_iteration - 1).zfill(6)}"
     chckpt_path = os.path.join(exp_dir, subdir, chckpt_num, "")
     if not os.path.exists(chckpt_path):
@@ -50,7 +51,7 @@ def _get_chckpt_path(training_iteration, subdir, exp_dir):
 
 
 def _mean_config(serialized_config):
-    """Calculate the average of best configs"""
+    """Average the numerical parameters of multiple models."""
 
     def _checkNumber(l):
         return all(isinstance(i, (int, float)) for i in l)
@@ -67,12 +68,12 @@ def _mean_config(serialized_config):
         else merged_config[key][0]
         for key in merged_config
     }
-
     return avg_config
 
 
 def _serialize_config(config, result=None, prefix=""):
-    """Serialize a nested config dictionary"""
+    """Serialize a nested config dictionary for model parameter averaging."""
+
     if result is None:
         result = dict()
     for k, v in config.items():
@@ -85,6 +86,8 @@ def _serialize_config(config, result=None, prefix=""):
 
 
 def _deserialize_config(serialized_config, result=None):
+    """Deserialize a nested config dictionary for model parameter averaging."""
+
     def tree():
         return defaultdict(tree)
 
@@ -99,7 +102,6 @@ def _deserialize_config(serialized_config, result=None):
 
     if result is None:
         result = dict()
-
     for k, v in serialized_config.items():
         keys_nested_iter = iter(k.split("__"))
         cur_level_dict = result
@@ -116,6 +118,13 @@ def _deserialize_config(serialized_config, result=None):
 
 
 def _filter_checkpoints(group):
+    """Remove non-checkpointed and last checkpoint rows from an experiment table.
+    The experiment table produced by _parse_experiment describes per-epoch performance
+    for each trial. Default checkpointing saves two checkpoints per trial: 1. The last
+    epoch and 2. The best epoch. This function discards all non-checkpointed epochs
+    and removes the rows corresponding to the last epoch. If more than one row remains
+    for a trial an error is thrown.
+    """
     non_null_check_rows = group.dropna(subset=["checkpoint_path"])
     if len(non_null_check_rows) == 1:
         return non_null_check_rows.iloc[0]
@@ -216,23 +225,25 @@ def get_top_k_trials(
 
 
 def get_trial_info(exp_dir, metric=None):
-    """
-    Given the directory path of a ray tune experiment as input, this function returns data on each trial
-    as specified by the given metric(es). If metric is `None`, a generic dataframe containing all
-    trial information is returned.
+    """Create a DataFrame containing trial performance data.
+
+    The dataframe describes the per-epoch performance of every trial in the experiment,
+    along with information on configurations, folds (if cross validation used), and
+    checkpoint locations.
 
     Parameters
     ----------
     exp_dir : str
-        The directory path of the ongoing or saved ray tune experiment. This path should contain
-        subdirectories with the prefix "trainable" for each trial conducted in the experiment.
+        Path containing ray tune experiment output.
     metric : list
-        List of metric(es) used to query from all trial information. Loss value is a valid metric.
-        If `None`, all trial information is returned
+        List of metrics to collect. Loss value is a valid metric. If `None`, the table
+        will contain all trial information.
+
     Returns
-    ----------
+    -------
     queried: pandas.DataFrame
-        A pandas DataFrame containing performance metrics of the all trials of a ray tune experiment.
+        A pandas DataFrame containing performance metrics for each epoch and trial of
+        the experiment.
     """
 
     queried = _parse_experiment(exp_dir)
@@ -280,7 +291,6 @@ def top_cv_trials(
     average_config : bool
         If `True`, the average of top-performing configurations will be calculated.
         Default value is `False`.
-
 
     Returns
     -------
