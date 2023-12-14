@@ -146,6 +146,49 @@ def _checkpoints(df):
     ]
 
 
+def _sortGroup(df, gb="cv_index", metric="mnist_auc", agr="mean"):
+    """Group cv results"""
+    if isinstance(df[gb].iloc[0], dict):
+        df["serialized_config"] = [
+            "|".join(
+                [
+                    k + "/" + str(v)
+                    for k, v in _serialize_config(cfg).items()
+                    if ("function" not in str(v)) and "data__cv_index" not in k
+                ]
+            )
+            for cfg in df["config"]
+        ]
+        grouped = df.groupby("serialized_config")
+        cfg_dict = {group: indexes for group, indexes in grouped.groups.items()}
+        gdf = grouped.agg({metric: agr}).reset_index()
+        gdf["config"] = df.config.iloc[
+            [list(cfg_dict[s_cfg])[0] for s_cfg in gdf["serialized_config"].values]
+        ].values
+        gdf.pop("serialized_config")
+    else:
+        gdf = df.groupby(gb).agg({metric: agr}).reset_index()
+    style_gdf = gdf.style.set_table_styles(
+        {
+            gdf[metric].idxmax(): [
+                {"selector": "", "props": "border-top: 3px solid black;"}
+            ]
+        },
+        overwrite=False,
+        axis=1,
+    )
+    style_gdf = style_gdf.set_table_styles(
+        {
+            gdf[metric].idxmax(): [
+                {"selector": "", "props": "border-bottom: 3px solid black;"}
+            ]
+        },
+        overwrite=False,
+        axis=1,
+    )
+    return style_gdf
+
+
 def get_top_k_trials(
     exp_dir, metric=None, mode="max", k=10, drop_dups=True, config_filter=None
 ):
