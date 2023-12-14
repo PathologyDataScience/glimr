@@ -167,7 +167,12 @@ def _sortGroup(df, gb="cv_index", metric="mnist_auc", agr="mean"):
         ].values
         gdf.pop("serialized_config")
     else:
-        gdf = df.groupby(gb).agg({metric: agr}).reset_index()
+        grouped = df.groupby(gb)
+        cfg_dict = {group: indexes for group, indexes in grouped.groups.items()}
+        gdf = grouped.agg({metric: agr}).reset_index()
+        gdf["config"] = df.config.iloc[
+            [list(cfg_dict[s_cfg])[0] for s_cfg in gdf[gb].values]
+        ].values
     style_gdf = gdf.style.set_table_styles(
         {
             gdf[metric].idxmax(): [
