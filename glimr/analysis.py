@@ -258,7 +258,7 @@ def get_trial_info(exp_dir, metric=None):
 
 
 def top_cv_trials(
-    exp_dir, metric=None, mode="max", model_selection="fold_top_1", average_config=False
+    exp_dir, metric, mode="max", model_selection="fold_top_1", average_config=False
 ):
     """Returns the top k cross validation trials of a ray tune experiment.
 
@@ -299,46 +299,41 @@ def top_cv_trials(
         (as measued by the specified `metric`) of a ray tune experiment.
     """
 
-    final_df = _parse_experiment(exp_dir)
+    df = _parse_experiment(exp_dir)
 
     # fill None values with ''
-    final_df.fillna("", inplace=True)
+    df.fillna("", inplace=True)
 
-    # get fold indexes
-    final_df["folds"] = [fold["data"]["cv_fold_index"] for fold in final_df["config"]]
+    # add fold indexes to table
+    df["cv_index"] = [fold["data"]["cv_index"] for fold in df["config"]]
 
-    # check if metric(s) exists in trials
-    if metric is not None:
-        if isinstance(metric, dict):
-            for key in metric:
-                if key not in final_df.columns:
-                    raise ValueError(
-                        (
-                            "Argument metric must be None or one or any combinations of "
-                            f"{final_df.columns.tolist()}."
-                        )
-                    )
-    if metric is None:
-        metric = final_df.columns[1]
+    # add checkpoint directories and remove non-checkpointed entries
+    df["checkpoint_path"] = _checkpoints(df)
+    df = df.groupby("trial_id").apply(_filter_checkpoints).reset_index(drop=True)
 
-    # sort results based on metric
-    if isinstance(metric, str):
-        final_df.sort_values(
-            by=metric, ascending=(mode == "min"), inplace=True, ignore_index=True
-        )
+    # check metric formatting and presence in report
+    if isinstance(metric, str) and metric not in df.columns:
+        raise ValueError(f"metric {metric} not found in results.")
+    elif isinstance(metric, dict):
+        for k, v in metric.items():
+            if k not in final_df.columns:
+                raise ValueError(f"metric {k} not found in results.")
+            if not isinstance(v, float):
+                raise ValueError(
+                    f"metric dict values must be float, received \"{type(v)}.__name__\""
+                )
 
-    # define "combined metric" column if metric is a dict.
-    # Example: metric={'softmax_auc': 0.7, 'softmax_balanced': 0.3}
+    # calculate weighted metric if dict
     if isinstance(metric, dict):
         keys = list(metric.keys())
-        final_df["combined_metric"] = np.sum(
-            final_df.filter(keys).values
+        df["weighted_metric"] = np.sum(
+            df.filter(keys).values
             * np.expand_dims(np.array(list(metric.values())), 0),
             -1,
         )
-        model_selection_metric = "combined_metric"
+        selection_metric = "weighted_metric"
     else:
-        model_selection_metric = metric
+        selection_metric = metric
 
     # build in functions
     def fold_top(df, metric, mode, k=1):
@@ -367,27 +362,19 @@ def top_cv_trials(
         out_df = out_df.reset_index(drop=True)
         return out_df
 
-    # get checkpoint dirs
-    final_df["checkpoint_path"] = _checkpoints(final_df)
-
-    # Verify checkpoints
-    final_df = (
-        final_df.groupby("trial_id").apply(_filter_checkpoints).reset_index(drop=True)
-    )
-
     # drop unnecessary columns
     if isinstance(metric, dict):
-        metric_names = list(metric.keys()) + ["combined_metric"]
+        metric_names = list(metric.keys()) + ["weighted_metric"]
     else:
         metric_names = [metric]
     metadata = [
-        "folds",
+        "cv_index",
         "trial_id",
         "training_iteration",
         "checkpoint_path",
         "config",
     ] + metric_names
-    final_df = final_df[metadata]
+    df = df[metadata]
 
     # model selection
     if model_selection is not None:
@@ -395,14 +382,14 @@ def top_cv_trials(
             if "top" in model_selection:
                 s1, s2, k = model_selection.split("_")
                 selected_configs = eval("_".join([s1, s2]))(
-                    final_df, model_selection_metric, mode, int(k)
+                    df, selection_metric, mode, int(k)
                 )
             else:
                 selected_configs = eval(model_selection)(
-                    final_df, model_selection_metric, mode
+                    df, selection_metric, mode
                 )
         elif isfunction(model_selection):
-            selected_configs = model_selection(final_df, model_selection_metric, mode)
+            selected_configs = model_selection(df, selection_metric, mode)
         if average_config:
             cfgs = selected_configs["config"].values
             serialized_config = [_serialize_config(cfg) for cfg in cfgs]
