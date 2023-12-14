@@ -44,10 +44,6 @@ class Search(object):
         of type tf.data.Dataset. This function should include a "batch"
         keyword argument and may include other keyword arguments to control
         data loading and preprocessing behavior.
-    stopper : ray.tune.Stopper
-        Defines the stopping criteria for terminating trials. May be overrided
-        by scheduler stopping criteria. Default value of `None` selects ray's
-        TrialPlateauStopper.
     metric : str
         The name of the metric to optimize. This is in the form "task_name"
         where "task" is the task name and "name" is the key value of the
@@ -62,6 +58,10 @@ class Search(object):
         The number of cross validation folds to perform. Each fold will
         run as a separate trial with the same configuration. Requires the
         dataloader function to have `cv_fold_index` and `cv_folds` arguments.
+    stopper : ray.tune.Stopper
+        Defines the stopping criteria for terminating trials. May be overrided
+        by scheduler stopping criteria. Default value of `None` selects ray's
+        TrialPlateauStopper.
     fit_kwargs : dict
         Keyword arguments for tf.keras.model.fit. Allows customization of
         keras model training options. Default value is None.
@@ -110,10 +110,10 @@ class Search(object):
         space,
         builder,
         loader,
-        stopper=None,
         metric=None,
         mode="max",
         cv_folds=None,
+        stopper=None,
         loader_kwargs=None,
         fit_kwargs=None,
     ):
@@ -130,19 +130,20 @@ class Search(object):
         self._space = space
         self.cv_folds = cv_folds
 
-        # check if data loader function has `cv_fold_index`, `cv_folds` arguments
+        # check if data loader function has `cv_index`, `cv_folds` arguments
         if cv_folds is not None:
             # add data loader arguments to config
-            config["cv_fold_index"] = tune.grid_search(list(range(cv_folds)))
+            space["data"]["cv_index"] = tune.grid_search(list(range(cv_folds)))
+            space["data"]["cv_folds"] = cv_folds
 
             # check that dataloader has required arguments for cross validation
             args = inspect.getfullargspec(loader)[0]
-            if "cv_fold_index" in args and "cv_folds" in args:
+            if "cv_index" in args and "cv_folds" in args:
                 pass
             else:
                 raise ValueError(
                     (
-                        "Cross validation requires data loader `cv_fold_index`, `cv_folds` function "
+                        "Cross validation requires data loader `cv_index`, `cv_folds` function "
                         "arguments."
                     )
                 )
