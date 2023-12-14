@@ -480,20 +480,19 @@ class Search(object):
         # Initiate a new actor for each trial to avoid leaks and memory growth
         tune_kwargs["reuse_actors"] = False
 
-        if search_alg is not None:
-            if self.cv_folds is not None:
-                # `BasicVariantGenerator` seach algorithm required for cross validation
-                tune_kwargs["search_alg"] = BasicVariantGenerator(
-                    constant_grid_search=True
-                )  # `constant_grid_search` must be True for CV.
-                warnings.warn(
-                    (
-                        "Replacing search algorithm with `BasicVariantGenerator` required for "
-                        "cross validation."
-                    )
+        if self.cv_folds is not None:
+            # `BasicVariantGenerator` seach algorithm required for cross validation
+            tune_kwargs["search_alg"] = BasicVariantGenerator(
+                constant_grid_search=True
+            )  # `constant_grid_search` must be True for CV.
+            warnings.warn(
+                (
+                    "Replacing search algorithm with `BasicVariantGenerator` required for "
+                    "cross validation."
                 )
-            else:
-                tune_kwargs["search_alg"] = search_alg
+            )
+        else:
+            tune_kwargs["search_alg"] = search_alg
         tune_config = TuneConfig(**tune_kwargs)
 
         # create run config
