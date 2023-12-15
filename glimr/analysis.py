@@ -1,53 +1,151 @@
-from ray.tune.search import sample
+from collections import OrderedDict, defaultdict
+from copy import deepcopy
+import json
+import numpy as np
 import os
 import pandas as pd
-import numpy as np
 import ray
+from ray.tune.search import sample
 from inspect import isfunction
-from collections import OrderedDict, defaultdict
-import json
 
 
-def _parse_experiment(exp_dir):
-    """Parses an experiment directory returning results as a pandas.Dataframe
+def _get_chckpt_path(training_iteration, subdir, exp_dir):
+    """Recover checkpoint path given a trial_id and epoch"""
+    chckpt_num = f"checkpoint_{str(training_iteration - 1).zfill(6)}"
+    chckpt_path = os.path.join(exp_dir, subdir, chckpt_num, "")
+    if not os.path.exists(chckpt_path):
+        return None
+    return chckpt_path
+
+
+def _checkpoints(df):
+    """Build list of checkpoints."""
+    return [
+        _get_chckpt_path(it, sb, dr)
+        for it, sb, dr in zip(df["training_iteration"], df["subdir"], df["exp_dir"])
+    ]
+
+
+def _config_enum(configurations):
+    """Enumerate configurations to link configuration across cv folds / trials"""
+
+    def remove_function(config):
+        # remove function keys
+        clean = deepcopy(config)
+        for k, v in config.items():
+            if isinstance(v, str):
+                if v.startswith("<function"):
+                    del clean[k]
+            elif isinstance(v, dict):
+                clean[k] = remove_function(v)
+        return clean
+
+    cleaned = []
+    for config in configurations:
+        clean = deepcopy(config)
+        clean = remove_function(clean)
+        del clean["data"]["cv_index"]
+        cleaned.append(clean)
+    mapping = {}
+    for clean in cleaned:
+        if json.dumps(clean) not in mapping.keys():
+            mapping[json.dumps(clean)] = len(mapping)
+    enumerated = [mapping[json.dumps(clean)] for clean in cleaned]
+    return enumerated
+
+
+def experiment_table(exp_dir, checkpointed=True):
+    """Parses an experiment directory returning results as a pandas.Dataframe.
+
+    The Dataframe can be used to analyze performance statistics of individual trials
+    and to identify checkpointed models of interest. Examples include identifying the
+    top models in each cross validation fold, or the configuration with the best overall
+    performance or highest median cross-validated performance. Each row of this table
+    represents one epoch of one trial.
 
     Parameters
     ----------
     exp_dir : str
         Path containing ray tune experiment output.
+    checkpointed : bool
+        Retain only rows corresponding to checkpointed trials. Default value is True.
 
     Returns
     -------
     df : pandas.DataFrame
-        A pandas DataFrame containing performance metrics for each epoch and trial of
-        the experiment.
+        A pandas DataFrame containing performance, configuration, and cross-validation
+        (if applicable) data for each trial.
     """
 
-    dataframes = []
+    # build dataframe
+    trials = []
     subdirs = os.listdir(exp_dir)
-    counter = 1
     for i, subdir in enumerate(subdirs):
         if subdir.startswith("trainable") and os.path.isdir(
             os.path.join(exp_dir, subdir)
         ):
             result_path = os.path.join(exp_dir, subdir, "result.json")
             if os.path.exists(result_path):
-                df = pd.read_json(result_path, lines=True)
-                df.insert(0, "trial_#", i)
-                df.insert(1, "subdir", subdir)
-                df.insert(2, "exp_dir", exp_dir)
-                dataframes.append(df)
-    return pd.concat(dataframes, ignore_index=True)
+                trial = pd.read_json(result_path, lines=True)
+                trial.insert(0, "trial_#", i)
+                trial.insert(1, "subdir", subdir)
+                trial.insert(2, "exp_dir", exp_dir)
+                trials.append(trial)
+    df = pd.concat(trials, ignore_index=True)
+
+    # fill None values with ''
+    df.fillna("", inplace=True)
+
+    # add checkpoint directories and remove non-checkpointed entries
+    df["checkpoint_path"] = _checkpoints(df)
+    if checkpointed:
+        df = df.dropna(subset=["checkpoint_path"]).reset_index()
+
+    # add cross-validation fold index
+    if "cv_index" in df.iloc[0]["config"]["data"]:
+        df["cv_index"] = [fold["data"]["cv_index"] for fold in df["config"]]
+
+    # add enumerated configurations - used for cross validation
+    if "cv_index" in df.loc[0, "config"]["data"]:
+        df["config_enum"] = _config_enum(df["config"])
+
+    return df
 
 
-def _get_chckpt_path(training_iteration, subdir, exp_dir):
-    """Recover checkpoint path given a trial_id and epoch"""
+def default_checkpoints(df):
+    """Selects the performance-criteria checkpoints for a set of trials.
 
-    chckpt_num = f"checkpoint_{str(training_iteration - 1).zfill(6)}"
-    chckpt_path = os.path.join(exp_dir, subdir, chckpt_num, "")
-    if not os.path.exists(chckpt_path):
-        return None
-    return chckpt_path
+    Each trial checkpoints: 1. The last epoch (to support trial resumption) and 2. An
+    epoch defined by the performance criteria such as peak accuracy. Given an experiment
+    dataframe, this function selects the rows corresponding to the performance
+    criteria checkpoint for each trial.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        An experiment dataframe.
+
+    Returns
+    -------
+    checkpointed : pandas.DataFrame
+        A single-row DataFrame containing the selected checkpoint.
+    """
+
+    def trial_checkpoint(trial):
+        if len(trial) == 1:
+            return trial.iloc[0]
+        elif len(trial) == 2:
+            return trial.loc[trial["training_iteration"].idxmin()]
+        else:
+            raise ValueError(
+                (
+                    "There are more than two checkpoints for trial "
+                    f"{trial.iloc[0]['trial']}"
+                )
+            )
+        return trial
+
+    return df.groupby("trial_id").apply(trial_checkpoint).reset_index(drop=True)
 
 
 def _mean_config(serialized_config):
@@ -115,35 +213,6 @@ def _deserialize_config(serialized_config, result=None):
             except StopIteration:
                 break
     return result
-
-
-def _filter_checkpoints(trial):
-    """Remove non-checkpointed and last checkpoint rows from a trial DataFrame.
-    Each row in the experiment DataFrame generated by _parse_experiment describes performance
-    metrics for one epoch of one trial. Default checkpointing saves two checkpoints per
-    trial: 1. The last epoch and 2. The best epoch. This function discards
-    non-checkpointed rows and removes the row corresponding to the last epoch. If more
-    than one row remains for a trial an error is thrown.
-    """
-    non_null_check_rows = trial.dropna(subset=["checkpoint_path"])
-    if len(non_null_check_rows) == 1:
-        return non_null_check_rows.iloc[0]
-    elif len(non_null_check_rows) == 2:
-        return non_null_check_rows.loc[
-            non_null_check_rows["training_iteration"].idxmin()
-        ]
-    else:
-        raise ValueError(
-            f"There are more than two checkpoints for trial {non_null_check_rows.iloc[0]['trial']}"
-        )
-
-
-def _checkpoints(df):
-    """Build list of checkpoints."""
-    return [
-        _get_chckpt_path(it, sb, dr)
-        for it, sb, dr in zip(df["training_iteration"], df["subdir"], df["exp_dir"])
-    ]
 
 
 def _sortGroup(df, gb="cv_index", metric="mnist_auc", agr="mean"):
@@ -270,39 +339,6 @@ def get_top_k_trials(
     column_order = metadata + [col for col in df.columns if col not in metadata]
 
     return final_df[column_order]
-
-
-def get_trial_info(exp_dir, metric=None):
-    """Create a DataFrame containing trial performance data.
-
-    The dataframe describes the per-epoch performance of every trial in the experiment,
-    along with information on configurations, folds (if cross validation used), and
-    checkpoint locations.
-
-    Parameters
-    ----------
-    exp_dir : str
-        Path containing ray tune experiment output.
-    metric : list
-        List of metrics to collect. Loss value is a valid metric. If `None`, the table
-        will contain all trial information.
-
-    Returns
-    -------
-    queried: pandas.DataFrame
-        A pandas DataFrame containing performance metrics for each epoch and trial of
-        the experiment.
-    """
-
-    queried = _parse_experiment(exp_dir)
-    columns = queried.columns
-    if metric is not None:
-        bool_list = [True if i in columns else False for i in metric]
-        if not all(bool_list):
-            raise ValueError(f"{metric[bool_list.index(False)]} is not a valid metric")
-        queried = queried.loc[:, metric]
-
-    return queried
 
 
 def top_cv_trials(
