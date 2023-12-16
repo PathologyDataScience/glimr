@@ -128,7 +128,7 @@ def default_checkpoints(df):
     Returns
     -------
     checkpointed : pandas.DataFrame
-        A single-row DataFrame containing the selected checkpoint.
+        A DataFrame containing the selected checkpoints for each trial.
     """
 
     def trial_checkpoint(trial):
@@ -148,45 +148,44 @@ def default_checkpoints(df):
     return df.groupby("trial_id").apply(trial_checkpoint).reset_index(drop=True)
 
 
-def get_top_k_trials(
-    exp_dir, metric=None, mode="max", k=10, drop_dups=True, config_filter=None
-):
-    """Returns the top k trials of a ray tune experiment as measured by a given metric.
+def top_k_trials(df, metric, mode="max", k=10, fold=None, config_filter=None):
+    """Filter the top k trials from an experiment DataFrame.
 
-    Given an experiment output path, this function returns the top k trials based on a
-    specified metric or custom filtering options.
+    This function can be applied to all trials within an experiment, or within
+    a single cross-validation fold. An optional filter argument can be used to
+    select configurations for analysis.
 
     Parameters
     ----------
-    exp_dir : str
-        The directory path of the ongoing or saved ray tune experiment.
+    df : pandas.DataFrame
+        A pandas DataFrame containing performance, configuration, and cross-validation
+        data for each trial.
     metric : str
-        The metric name used for sorting the trials. If `None`, the first metric
-        reported by ray tune will be used. Default value is `None`.
+        The metric name used for sorting the trials.
     mode : str
-        Sorting order to determine top trials. Must be one of "max" or "min". By default,
-        `mode="max"` sorts trials in descending order.
+        Sorting order to determine top trials. Must be one of "max" or "min". By 
+        default, `mode="max"` sorts trials in descending order.
     k : int
-        The number of trials to retrieve. If `None` all trials will be returned. Default
-        value is 10.
-    drop_dups : bool
-        If `True` duplicate trials will be eliminated from the output, retaining only
-        the first / best trial as determined by `metric` and `mode`. If `False`,
-        multiple epochs/checkpoints from a single trial may be included in the output.
-        Default value is `True`.
+        The number of trials to retrieve.
+    fold : int
+        Restrict analysis to a specific fold. If `None`, all folds will be included.
     config_filter : function
-        An optional function for filtering the rows of the dataframe based on values
-        in the config dictionary of a trial. This function should accept the trial
-        configuration dicationary as its only input, and should return a boolean
-        indicating whether the trial should be included (True) or not (False). Default
-        value is `None`.
+        An optional function for filtering based on trial configurations. This function 
+        should accept the trial configuration dicationary as its only input, and should 
+        return a boolean indicating whether the trial should be included (True) or not 
+        (False). Default value is `None`.
 
     Returns
     -------
     final_df : pandas.DataFrame
-        a pandas DataFrame containing performance metrics and metadata detailing the top k trials
-        (as measued by the specified `metric`) of a ray tune experiment.
+        A pandas DataFrame containing performance metrics and metadata for the top
+        k trials.
     """
+    
+    if metric not in df.columns:
+        raise ValueError(
+            f"Argument metric must be None or one of {df.columns.tolist()}."
+        )
 
     if mode not in ["max", "min"]:
         raise ValueError("Argument mode must be one of 'max' or 'min'.")
@@ -194,33 +193,66 @@ def get_top_k_trials(
     if k is not None and (not isinstance(k, int) or k < 1):
         raise ValueError("Argument k must be a positive integer or None.")
 
-    final_df = _parse_experiment(exp_dir)
-
-    if metric is not None and metric not in final_df.columns:
-        raise ValueError(
-            f"Argument metric must be None or one of {final_df.columns.tolist()}."
-        )
-
-    if metric is None:
-        metric = final_df.columns[1]
-
-    final_df.sort_values(
-        by=metric, ascending=(mode == "min"), inplace=True, ignore_index=True
-    )
-
-    if drop_dups:
-        final_df.drop_duplicates(
-            subset="trial_id", keep="first", inplace=True, ignore_index=True
-        )
+    if fold is not None and not isinstance(fold, int):
+        raise ValueError("Argument fold must be integer or None.")
 
     if config_filter is not None:
-        final_df = final_df[final_df["config"].apply(lambda c: config_filter(c))]
+        df = df[df["config"].apply(lambda c: config_filter(c))]
 
-    if k is not None and k < final_df.shape[0]:
-        final_df = final_df.head(k)
+    if fold is not None:
+        df = df.loc[df["cv_index"] == fold]
 
-    final_df["checkpoint_path"] = _checkpoints(final_df)
-    metadata = ["trial_id", "training_iteration", "checkpoint_path", "config", metric]
-    column_order = metadata + [col for col in df.columns if col not in metadata]
+    df.sort_values(
+        by=metric, ascending=(mode=="min"), inplace=True, ignore_index=True
+    )
 
-    return final_df[column_order]
+    return df.head(k)
+
+
+def top_k_configs(df, metric, mode="max", k=10, statistic=np.median):
+    """Filter the top k configurations from an experiment DataFrame.
+    
+    This function analyzes aggregate performance of a cross validation experiment
+    to identify the top performing trials. This is 
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        A pandas DataFrame containing performance, configuration, and cross-validation
+        data for each trial.
+    metric : str
+        The metric name used for sorting the trials.
+    mode : str
+        Sorting order to determine top trials. Must be one of "max" or "min". By 
+        default, `mode="max"` sorts trials in descending order.
+    k : int
+        The number of trials to retrieve.
+    fold : int
+        Restrict analysis to a specific fold. If `None`, all folds will be included.
+    statistic : function
+        The method of aggregation used to rank configuration. Default value is
+        `np.median`.
+
+    Returns
+    -------
+    final_df : pandas.DataFrame
+        A pandas DataFrame containing performance metrics and metadata for the top
+        k configurations.    
+    """
+
+    if metric not in df.columns:
+        raise ValueError(
+            f"Argument metric must be None or one of {df.columns.tolist()}."
+        )
+
+    if mode not in ["max", "min"]:
+        raise ValueError("Argument mode must be one of 'max' or 'min'.")
+
+    if k is not None and (not isinstance(k, int) or k < 1):
+        raise ValueError("Argument k must be a positive integer or None.")
+
+    ranking = np.argsort(df.groupby("config_enum")[metric].apply(statistic))
+    if mode == "max":
+        ranking = ranking[::-1]
+    
+    return df.loc[df["config_enum"].isin(ranking[0:k])]
