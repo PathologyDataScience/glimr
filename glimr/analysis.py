@@ -140,7 +140,7 @@ def default_checkpoints(df):
             raise ValueError(
                 (
                     "There are more than two checkpoints for trial "
-                    f"{trial.iloc[0]['trial']}"
+                    f"{trial.iloc[0]['trial_id']}"
                 )
             )
         return trial
@@ -163,16 +163,16 @@ def top_k_trials(df, metric, mode="max", k=10, fold=None, config_filter=None):
     metric : str
         The metric name used for sorting the trials.
     mode : str
-        Sorting order to determine top trials. Must be one of "max" or "min". By 
+        Sorting order to determine top trials. Must be one of "max" or "min". By
         default, `mode="max"` sorts trials in descending order.
     k : int
         The number of trials to retrieve.
     fold : int
         Restrict analysis to a specific fold. If `None`, all folds will be included.
     config_filter : function
-        An optional function for filtering based on trial configurations. This function 
-        should accept the trial configuration dicationary as its only input, and should 
-        return a boolean indicating whether the trial should be included (True) or not 
+        An optional function for filtering based on trial configurations. This function
+        should accept the trial configuration dicationary as its only input, and should
+        return a boolean indicating whether the trial should be included (True) or not
         (False). Default value is `None`.
 
     Returns
@@ -181,7 +181,7 @@ def top_k_trials(df, metric, mode="max", k=10, fold=None, config_filter=None):
         A pandas DataFrame containing performance metrics and metadata for the top
         k trials.
     """
-    
+
     if metric not in df.columns:
         raise ValueError(
             f"Argument metric must be None or one of {df.columns.tolist()}."
@@ -203,7 +203,7 @@ def top_k_trials(df, metric, mode="max", k=10, fold=None, config_filter=None):
         df = df.loc[df["cv_index"] == fold]
 
     df.sort_values(
-        by=metric, ascending=(mode=="min"), inplace=True, ignore_index=True
+        by=metric, ascending=(mode == "min"), inplace=True, ignore_index=True
     )
 
     return df.head(k)
@@ -211,9 +211,9 @@ def top_k_trials(df, metric, mode="max", k=10, fold=None, config_filter=None):
 
 def top_k_configs(df, metric, mode="max", k=10, statistic=np.median):
     """Filter the top k configurations from an experiment DataFrame.
-    
+
     This function analyzes aggregate performance of a cross validation experiment
-    to identify the top performing trials. This is 
+    to identify the top performing trials. This is
 
     Parameters
     ----------
@@ -223,7 +223,7 @@ def top_k_configs(df, metric, mode="max", k=10, statistic=np.median):
     metric : str
         The metric name used for sorting the trials.
     mode : str
-        Sorting order to determine top trials. Must be one of "max" or "min". By 
+        Sorting order to determine top trials. Must be one of "max" or "min". By
         default, `mode="max"` sorts trials in descending order.
     k : int
         The number of trials to retrieve.
@@ -237,7 +237,7 @@ def top_k_configs(df, metric, mode="max", k=10, statistic=np.median):
     -------
     final_df : pandas.DataFrame
         A pandas DataFrame containing performance metrics and metadata for the top
-        k configurations.    
+        k configurations.
     """
 
     if metric not in df.columns:
@@ -254,5 +254,5 @@ def top_k_configs(df, metric, mode="max", k=10, statistic=np.median):
     ranking = np.argsort(df.groupby("config_enum")[metric].apply(statistic))
     if mode == "max":
         ranking = ranking[::-1]
-    
+
     return df.loc[df["config_enum"].isin(ranking[0:k])]
