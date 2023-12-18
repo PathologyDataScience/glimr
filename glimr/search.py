@@ -1,5 +1,9 @@
 import datetime
+import gc
+from glimr.keras import keras_optimizer
+import inspect
 import os
+import psutil
 from ray import tune
 from ray.air import CheckpointConfig
 from ray.air.config import FailureConfig, RunConfig
@@ -8,11 +12,10 @@ from ray.tune.integration.keras import TuneReportCheckpointCallback
 from ray.tune.schedulers import AsyncHyperBandScheduler
 from ray.tune.stopper import TrialPlateauStopper
 from ray.tune.tune_config import TuneConfig
-from glimr.keras import keras_optimizer
+from ray.tune.search.basic_variant import BasicVariantGenerator
 import tensorflow as tf
-import psutil
 import subprocess
-import gc
+import warnings
 
 
 class Search(object):
@@ -41,10 +44,6 @@ class Search(object):
         of type tf.data.Dataset. This function should include a "batch"
         keyword argument and may include other keyword arguments to control
         data loading and preprocessing behavior.
-    stopper : ray.tune.Stopper
-        Defines the stopping criteria for terminating trials. May be overrided
-        by scheduler stopping criteria. Default value of `None` selects ray's
-        TrialPlateauStopper.
     metric : str
         The name of the metric to optimize. This is in the form "task_name"
         where "task" is the task name and "name" is the key value of the
@@ -55,6 +54,14 @@ class Search(object):
         Either "max" or "min" indicating whether to maximize or minimize
         the metric. Default value is "max". If using loss for tuning
         "min" should be selected.
+    cv_folds : int
+        The number of cross validation folds to perform. Each fold will
+        run as a separate trial with the same configuration. Requires the
+        dataloader function to have `cv_fold_index` and `cv_folds` arguments.
+    stopper : ray.tune.Stopper
+        Defines the stopping criteria for terminating trials. May be overrided
+        by scheduler stopping criteria. Default value of `None` selects ray's
+        TrialPlateauStopper.
     fit_kwargs : dict
         Keyword arguments for tf.keras.model.fit. Allows customization of
         keras model training options. Default value is None.
@@ -103,9 +110,10 @@ class Search(object):
         space,
         builder,
         loader,
-        stopper=None,
         metric=None,
         mode="max",
+        cv_folds=None,
+        stopper=None,
         loader_kwargs=None,
         fit_kwargs=None,
     ):
@@ -120,6 +128,25 @@ class Search(object):
         space["fit_kwargs"] = fit_kwargs
         space["loader"] = loader
         self._space = space
+        self.cv_folds = cv_folds
+
+        # check if data loader function has `cv_index`, `cv_folds` arguments
+        if cv_folds is not None:
+            # add data loader arguments to config
+            space["data"]["cv_index"] = tune.grid_search(list(range(cv_folds)))
+            space["data"]["cv_folds"] = cv_folds
+
+            # check that dataloader has required arguments for cross validation
+            args = inspect.getfullargspec(loader)[0]
+            if "cv_index" in args and "cv_folds" in args:
+                pass
+            else:
+                raise ValueError(
+                    (
+                        "Cross validation requires data loader `cv_index`, `cv_folds` function "
+                        "arguments."
+                    )
+                )
 
         # extract default optimization metric - first task & first metric
         if metric is None:
@@ -149,7 +176,11 @@ class Search(object):
         else:
             if not isinstance(stopper, tune.Stopper):
                 raise ValueError(
-                    "stopper must be a ray.tune.Stopper object. For example: TrialPlateauStopper, MaximumIterationStopper, ExperimentPlateauStopper, TimeOutStopper, etc."
+                    (
+                        "stopper must be a ray.tune.Stopper object. For example: "
+                        "TrialPlateauStopper, MaximumIterationStopper, ExperimentPlateauStopper, "
+                        "TimeOutStopper, etc."
+                    )
                 )
             self.stopper = stopper
 
@@ -295,7 +326,7 @@ class Search(object):
         passing a `ScalingConfig` object to `ray.tune.with_resources` doe not result in GPU utilization, regardless
         of the configuration values.
 
-        See https://docs.ray.io/en/latest/tune/tutorials/tune-resources.html for details on parallelism in ray.tune 
+        See https://docs.ray.io/en/latest/tune/tutorials/tune-resources.html for details on parallelism in ray.tune
         and how resources are assigned to trials in tune experiments.
         """
 
@@ -446,11 +477,21 @@ class Search(object):
         tune_kwargs["num_samples"] = num_samples
         tune_kwargs["scheduler"] = scheduler
 
-        # Initiate a new actor for a new trial (to improve memory consumption with fractional GPUs/CPUs)
-        # NOTE: It has been observed that memory can keep increasing if it is set to 'True'.
+        # Initiate a new actor for each trial to avoid leaks and memory growth
         tune_kwargs["reuse_actors"] = False
 
-        if search_alg is not None:
+        if self.cv_folds is not None:
+            # `BasicVariantGenerator` seach algorithm required for cross validation
+            tune_kwargs["search_alg"] = BasicVariantGenerator(
+                constant_grid_search=True
+            )  # `constant_grid_search` must be True for CV.
+            warnings.warn(
+                (
+                    "Replacing search algorithm with `BasicVariantGenerator` required for "
+                    "cross validation."
+                )
+            )
+        else:
             tune_kwargs["search_alg"] = search_alg
         tune_config = TuneConfig(**tune_kwargs)
 
