@@ -80,10 +80,12 @@ def experiment_table(exp_dir, checkpointed=True):
     # build dataframe
     trials = []
     subdirs = os.listdir(exp_dir)
-    for i, subdir in enumerate(subdirs):
-        if subdir.startswith("trainable") and os.path.isdir(
-            os.path.join(exp_dir, subdir)
-        ):
+    subdirs = [
+        subdir for subdir in subdirs if os.path.isdir(os.path.join(exp_dir, subdir))
+    ]
+    ordered_subdir = sorted(subdirs)
+    for i, subdir in enumerate(ordered_subdir):
+        if subdir.startswith("trainable"):
             result_path = os.path.join(exp_dir, subdir, "result.json")
             if os.path.exists(result_path):
                 trial = pd.read_json(result_path, lines=True)
